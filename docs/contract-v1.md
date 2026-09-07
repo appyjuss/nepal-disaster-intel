@@ -54,6 +54,23 @@ V1 **reconstructs**. It does not predict. Prediction is V4.
   the pre-event terrain that conditioned it.
 - Optical corroboration is weak: best post-event Sentinel-2 look is 54% cloud.
 
+## V1 results so far (2026-09-07)
+
+Full area of interest, three tracks, 30 m, 3 dB threshold, 1 ha minimum: **88 seconds**,
+732 polygons, of which **16 are corroborated by both look directions**. Every
+high-confidence detection is a *darkening* of 5.7 to 7.2 dB on near-flat ground,
+clustered along the valley floor — the signature of smooth new surface, meaning water
+or fresh mud. The medium-confidence detections are the opposite: brightening on 26 to
+28 degree slopes, which is what freshly exposed rough ground looks like.
+
+Two further limitations this surfaced, on top of those above:
+
+- Twelve days separate the pre and post images in peak monsoon. Normal river-level
+  change produces the same valley-floor darkening as flooding does, so the
+  valley-floor detections are not separable from seasonal variation on radar alone.
+- Track 121 covers only ~16% of the area, so its contribution is partial. Coverage is
+  reported per track as `usable_px_pct` and should be read before trusting a track.
+
 ## Version ladder (not V1 scope, recorded so V1 does not paint us into a corner)
 
 V2 lakehouse + Spark, Nepal-wide · V3 historical disaster corpus · V4 ML susceptibility/impact
