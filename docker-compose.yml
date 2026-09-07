@@ -1,0 +1,42 @@
+# Local object storage, so the lakehouse runs against the S3 API rather than a
+# filesystem. The point is not realism for its own sake: it means the move to AWS
+# is a change of URI and credentials, not a change of code path.
+services:
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    # Bound to loopback deliberately. Publishing these as "9000:9000" listens on
+    # every interface, which puts a MinIO instance holding default credentials on
+    # whatever network the laptop is joined to. Nothing outside this machine needs
+    # to reach the local warehouse.
+    ports:
+      - "127.0.0.1:9000:9000"   # S3 API
+      - "127.0.0.1:9001:9001"   # web console
+    environment:
+      # Throwaway credentials for a loopback-only service holding reproducible
+      # public data. They are not a secret and must never be reused anywhere real.
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-ndiplocal}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-ndiplocal}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Creates the warehouse bucket once MinIO is up, then exits.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-ndiplocal} ${MINIO_ROOT_PASSWORD:-ndiplocal} &&
+      mc mb --ignore-existing local/ndip-warehouse &&
+      echo 'bucket ndip-warehouse ready'
+      "
+
+volumes:
+  minio-data:

@@ -12,3 +12,4 @@ data/**
 .terraform/
 *.tfstate*
 .tofu/
+.env.local
