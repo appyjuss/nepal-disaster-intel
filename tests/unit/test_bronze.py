@@ -108,7 +108,9 @@ def test_reingest_picks_up_corrected_source_values(writer, catalog):
 def test_same_item_id_under_a_different_event_is_a_separate_row(writer, catalog):
     """event_id is part of the key, so two events sharing a scene stay independent."""
     writer.write_stac_items([stac_item("S1_A")], event_id=EVENT_ID, source_endpoint=ENDPOINT)
-    writer.write_stac_items([stac_item("S1_A")], event_id="NPL-2025-OTHER", source_endpoint=ENDPOINT)
+    writer.write_stac_items(
+        [stac_item("S1_A")], event_id="NPL-2025-OTHER", source_endpoint=ENDPOINT
+    )
 
     assert len(rows(catalog, STAC_ITEMS)) == 2
 

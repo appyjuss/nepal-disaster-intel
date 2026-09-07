@@ -22,7 +22,10 @@ def test_agreement_across_geometries_is_the_only_route_to_high_confidence():
 
 
 def test_a_weak_single_geometry_detection_is_low_not_medium():
-    assert poly(detected_in=frozenset({"desc"}), backscatter_delta_db=-1.2).confidence() is Confidence.LOW
+    assert (
+        poly(detected_in=frozenset({"desc"}), backscatter_delta_db=-1.2).confidence()
+        is Confidence.LOW
+    )
 
 
 def test_speckle_sized_polygons_are_rejected_regardless_of_agreement():

@@ -80,8 +80,7 @@ def summarise(
     window_totals: dict[int, float] = {}
     for days in windows:
         window_totals[days] = sum(
-            by_date.get(event_date - timedelta(days=offset), 0.0)
-            for offset in range(1, days + 1)
+            by_date.get(event_date - timedelta(days=offset), 0.0) for offset in range(1, days + 1)
         )
 
     peak = max(series, key=lambda d: d.precipitation_mm, default=None)

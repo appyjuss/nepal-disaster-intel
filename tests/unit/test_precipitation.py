@@ -35,7 +35,9 @@ def test_trishuli_reads_as_saturation_not_cloudburst():
 
 
 def test_a_true_cloudburst_is_classified_as_one():
-    series = [DailyRainfall(on=EVENT - timedelta(days=i), precipitation_mm=1.0) for i in range(1, 15)]
+    series = [
+        DailyRainfall(on=EVENT - timedelta(days=i), precipitation_mm=1.0) for i in range(1, 15)
+    ]
     series.append(DailyRainfall(on=EVENT, precipitation_mm=200.0))
     ctx = summarise(series, EVENT)
     assert ctx.is_cloudburst_pattern is True
