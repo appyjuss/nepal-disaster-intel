@@ -16,7 +16,12 @@ mise run tf-test      # opentofu validate + test with mocked providers (no cloud
 
 uv run ndip discover                       # live discovery for the Trishuli event
 uv run ndip discover --bbox "w,s,e,n" -v   # override AOI
+uv run ndip ingest                         # discover, then land results in bronze
 ```
+
+The warehouse defaults to `data/warehouse` on the local filesystem with a SQLite
+catalog. To run against object storage instead, set `NDIP_WAREHOUSE=s3://...`,
+`NDIP_S3_ENDPOINT` and the usual AWS credential variables — no code changes.
 
 Docker Desktop on Windows with WSL integration enabled for this Ubuntu distro. If `docker`
 vanishes from PATH, the toggle is Docker Desktop → Settings → Resources → WSL Integration.
@@ -36,6 +41,12 @@ vanishes from PATH, the toggle is Docker Desktop → Settings → Resources → 
   event window. See ADR 0001 before "just adding NDVI".
 - **ERA5 is a ~25 km grid.** Every rainfall figure leaving this system carries the
   "context, not measurement" caveat. Do not present it as observed rainfall.
+- **Bronze writes upsert, they do not append.** Ingests get retried; a rerun must
+  correct rows in place. If you add a bronze table, give it a natural key.
+- **Sentinel-1 arrives as several frames per acquisition**, sliced along the orbit
+  (you will see 00:18 and 00:19 on the same track). They are not duplicates. Pair
+  selection currently picks one frame arbitrarily; change detection will need to
+  mosaic the frames covering the AOI before differencing.
 
 ## Layering
 
