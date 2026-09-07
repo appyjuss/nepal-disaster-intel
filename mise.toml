@@ -1,0 +1,40 @@
+[tools]
+python = "3.12"
+uv = "latest"
+opentofu = "latest"
+duckdb = "latest"
+
+[env]
+_.python.venv = { path = ".venv", create = true }
+NDIP_ROOT = "{{config_root}}"
+NDIP_DATA = "{{config_root}}/data"
+
+[tasks.install]
+description = "Install python deps"
+run = "uv sync --all-extras"
+
+[tasks.test]
+description = "Unit tests only (no network)"
+run = "uv run pytest -m 'not integration' -q"
+
+[tasks.test-all]
+description = "All tests including network-hitting integration"
+run = "uv run pytest -q"
+
+[tasks.lint]
+run = ["uv run ruff check src tests", "uv run ruff format --check src tests"]
+
+[tasks.fmt]
+run = ["uv run ruff format src tests", "uv run ruff check --fix src tests"]
+
+[tasks.typecheck]
+run = "uv run mypy"
+
+[tasks.dagster]
+description = "Launch Dagster UI at localhost:3000"
+run = "uv run dagster dev -m orchestration.definitions"
+
+[tasks.tf-test]
+description = "Validate infra with mocked providers (no cloud, no Docker)"
+dir = "infra"
+run = ["tofu init -backend=false", "tofu validate", "tofu test"]
