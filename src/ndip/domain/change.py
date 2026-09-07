@@ -10,8 +10,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-# Below this, a polygon is indistinguishable from SAR speckle at 10 m pixel spacing.
-DEFAULT_MIN_MAPPING_UNIT_M2 = 2_000.0
+# One hectare. At 30 m pixels that is roughly eleven cells — the smallest region
+# whose shape and area mean anything. Smaller detections exist in the silver layer
+# but are not delineations, they are pixels that passed a test.
+DEFAULT_MIN_MAPPING_UNIT_M2 = 10_000.0
+
+# A single look direction can still be convincing, but only well beyond the level
+# that got the pixel detected in the first place. Setting this at the detection
+# threshold would make the grade automatic and therefore meaningless.
+STRONG_SINGLE_GEOMETRY_DB = 6.0
 
 # Slopes below this are alluvial/valley-floor: change there is more likely flood,
 # river migration or harvest than slope failure. Not a rejection, a classification.
@@ -72,9 +79,10 @@ class ChangePolygon:
             return Confidence.REJECTED
         if self.geometry_agreement:
             return Confidence.HIGH
-        # A single geometry can still be convincing if the radiometric change is large,
-        # but it never reaches HIGH — that grade is reserved for geometric corroboration.
-        if abs(self.backscatter_delta_db) >= 3.0:
+        # A single geometry can still be convincing if the radiometric change is
+        # large, but it never reaches HIGH — that grade is reserved for geometric
+        # corroboration.
+        if abs(self.backscatter_delta_db) >= STRONG_SINGLE_GEOMETRY_DB:
             return Confidence.MEDIUM
         return Confidence.LOW
 
