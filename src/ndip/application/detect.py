@@ -8,6 +8,7 @@ the look direction moves, real ground change does not.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -140,13 +141,35 @@ def detect_change(
         raise LookupError(f"no track produced a detection for {event.event_id}")
 
     changes, geometries = _grade_by_agreement(
-        tracks, min_mapping_unit_m2=min_mapping_unit_m2, event_id=event.event_id
+        tracks,
+        min_mapping_unit_m2=min_mapping_unit_m2,
+        event_id=event.event_id,
+        fingerprint=(
+            f"band={band}|threshold_db={threshold_db}|mmu={min_mapping_unit_m2}"
+            f"|res={tracks[0].pair.resolution_m}"
+        ),
     )
     return DetectionResult(event=event, tracks=tracks, changes=changes, geometries_of=geometries)
 
 
+def _polygon_id(event_id: str, geometry: BaseGeometry, fingerprint: str) -> str:
+    """An id that names the region, not its position in a list.
+
+    A running index collides across runs: a second run over a different area reuses
+    the same ids and upserts over unrelated polygons. Deriving the id from the
+    geometry and the parameters that produced it makes a rerun genuinely idempotent
+    and keeps two different claims apart.
+    """
+    payload = f"{event_id}|{fingerprint}|{geometry.wkt}".encode()
+    return f"{event_id}-{hashlib.sha256(payload).hexdigest()[:12]}"
+
+
 def _grade_by_agreement(
-    tracks: list[TrackDetection], *, min_mapping_unit_m2: float, event_id: str
+    tracks: list[TrackDetection],
+    *,
+    min_mapping_unit_m2: float,
+    event_id: str,
+    fingerprint: str = "",
 ) -> tuple[list[ChangePolygon], dict[str, BaseGeometry]]:
     """Split detections into the part both look directions saw and the parts only
     one did.
@@ -176,7 +199,7 @@ def _grade_by_agreement(
 
     changes: list[ChangePolygon] = []
     geometries: dict[str, BaseGeometry] = {}
-    for index, (geom, detected_in) in enumerate(regions):
+    for geom, detected_in in regions:
         if geom.is_empty or geom.area < min_mapping_unit_m2:
             continue
         mean_slope = zonal_mean(slope, geom, transform)
@@ -189,7 +212,7 @@ def _grade_by_agreement(
         if not np.isfinite(mean_slope) or not finite:
             continue
 
-        polygon_id = f"{event_id}-{index:05d}"
+        polygon_id = _polygon_id(event_id, geom, fingerprint)
         geometries[polygon_id] = geom
         changes.append(
             ChangePolygon(
