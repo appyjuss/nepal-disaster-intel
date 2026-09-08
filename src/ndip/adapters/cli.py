@@ -12,16 +12,23 @@ from pathlib import Path
 import structlog
 
 from ndip.adapters.config import DEFAULT_DATA_DIR, load_settings
-from ndip.adapters.lakehouse.bronze import BronzeWriter
+from ndip.adapters.lakehouse.bronze import BronzeWriter, read_rainfall
 from ndip.adapters.lakehouse.catalog import build_catalog
 from ndip.adapters.lakehouse.gold import GoldWriter
 from ndip.adapters.lakehouse.silver import SilverWriter, read_change_polygons
-from ndip.adapters.osm.overture import DEFAULT_RELEASE, ensure_extract
+from ndip.adapters.osm.overture import DEFAULT_RELEASE, ensure_extract, load_drainage
 from ndip.adapters.population.worldpop import ensure_raster
 from ndip.adapters.raster.rtc import DEFAULT_RESOLUTION_M, RtcLoader
 from ndip.adapters.stac.client import EARTH_SEARCH, StacSearch
-from ndip.adapters.terrain.dem import load_slope_degrees, utm_epsg
-from ndip.adapters.weather.open_meteo import fetch_daily_rainfall
+from ndip.adapters.terrain.dem import load_slope_degrees, load_terrain_grid, utm_epsg
+from ndip.adapters.weather.open_meteo import (
+    NOMINAL_GRID_KM,
+    fetch_daily_rainfall,
+)
+from ndip.adapters.weather.open_meteo import (
+    SOURCE_ID as RAINFALL_SOURCE,
+)
+from ndip.application.context import build_context
 from ndip.application.detect import detect_change
 from ndip.application.discover import discover
 from ndip.application.events import REGISTRY, TRISHULI_2026_08_26
@@ -82,6 +89,14 @@ def main(argv: list[str] | None = None) -> int:
     x.add_argument("--refresh", action="store_true", help="re-download the Overture extract")
     x.add_argument("-v", "--verbose", action="store_true")
 
+    k = sub.add_parser("context", help="terrain and rainfall conditions per corroborated change")
+    k.add_argument("--event", default=TRISHULI_2026_08_26.event_id, choices=sorted(REGISTRY))
+    k.add_argument("--bbox", help="override AOI as 'w,s,e,n' in EPSG:4326")
+    k.add_argument("--resolution-m", type=int, default=DEFAULT_RESOLUTION_M)
+    k.add_argument("--release", default=DEFAULT_RELEASE, help="Overture release")
+    k.add_argument("--confidence", default="high")
+    k.add_argument("-v", "--verbose", action="store_true")
+
     args = parser.parse_args(argv)
     _configure_logging(args.verbose)
 
@@ -91,6 +106,52 @@ def main(argv: list[str] | None = None) -> int:
             event = replace(event, aoi=BBox.parse(args.bbox))
         except ValueError as exc:
             parser.error(f"invalid --bbox: {exc}")
+
+    if args.command == "context":
+        settings = load_settings()
+        catalog = build_catalog(settings)
+        grades = tuple(g.strip() for g in args.confidence.split(",") if g.strip())
+        polygons = read_change_polygons(catalog, event_id=event.event_id, confidence=grades)
+        if not polygons:
+            print(
+                f"error: no {'/'.join(grades)} polygons in silver for {event.event_id}; "
+                "run 'ndip detect' first",
+                file=sys.stderr,
+            )
+            return 2
+        series = read_rainfall(catalog, event_id=event.event_id)
+        if not series:
+            print(
+                f"error: no rainfall in bronze for {event.event_id}; run 'ndip ingest' first",
+                file=sys.stderr,
+            )
+            return 2
+
+        cache = Path(os.environ.get("NDIP_DATA", DEFAULT_DATA_DIR))
+        extract = ensure_extract(event.aoi, cache / "overture", release=args.release)
+        grid = load_terrain_grid(event.aoi, resolution_m=args.resolution_m)
+        result = build_context(
+            event.event_id,
+            event.occurred_on,
+            polygons,
+            grid=grid,
+            rainfall_series=series,
+            drainage_wkb=load_drainage(extract),
+            projected_epsg=utm_epsg(event.aoi),
+        )
+        print()
+        for line in result.summary_lines():
+            print(line)
+        written = GoldWriter(catalog).write_event_context(
+            result,
+            event_date=event.occurred_on,
+            rainfall_source=RAINFALL_SOURCE,
+            rainfall_grid_km=NOMINAL_GRID_KM,
+            terrain_source="copernicus-dem-glo-30",
+            drainage_source=f"overture/{extract.release}/base/water",
+        )
+        print(f"\n  wrote {written} rows to gold.event_context\n")
+        return 0
 
     if args.command == "expose":
         settings = load_settings()
