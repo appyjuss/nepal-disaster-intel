@@ -137,17 +137,27 @@ def test_polygon_ids_identify_the_region_not_its_position_in_a_list():
     """Regression: ids were a running index, so a run over a different area or with
     different parameters reused them and upserted over unrelated polygons. A full-AOI
     run overwrote 40 rows from an earlier smaller run."""
-    a, _ = grade([track(85, OrbitState.ASCENDING, [box(0, 0, 400, 400)]),
-                  track(19, OrbitState.DESCENDING, [box(0, 0, 400, 400)])])
-    b, _ = grade([track(85, OrbitState.ASCENDING, [box(500, 500, 900, 900)]),
-                  track(19, OrbitState.DESCENDING, [box(500, 500, 900, 900)])])
+    a, _ = grade(
+        [
+            track(85, OrbitState.ASCENDING, [box(0, 0, 400, 400)]),
+            track(19, OrbitState.DESCENDING, [box(0, 0, 400, 400)]),
+        ]
+    )
+    b, _ = grade(
+        [
+            track(85, OrbitState.ASCENDING, [box(500, 500, 900, 900)]),
+            track(19, OrbitState.DESCENDING, [box(500, 500, 900, 900)]),
+        ]
+    )
     assert a[0].polygon_id != b[0].polygon_id, "different regions must not share an id"
 
 
 def test_the_same_region_gets_the_same_id_on_a_rerun():
     """This is what makes the silver upsert meaningful rather than accidental."""
-    tracks = [track(85, OrbitState.ASCENDING, [box(0, 0, 400, 400)]),
-              track(19, OrbitState.DESCENDING, [box(0, 0, 400, 400)])]
+    tracks = [
+        track(85, OrbitState.ASCENDING, [box(0, 0, 400, 400)]),
+        track(19, OrbitState.DESCENDING, [box(0, 0, 400, 400)]),
+    ]
     first, _ = grade(tracks)
     second, _ = grade(tracks)
     assert first[0].polygon_id == second[0].polygon_id
@@ -156,11 +166,16 @@ def test_the_same_region_gets_the_same_id_on_a_rerun():
 def test_different_detection_parameters_produce_different_ids():
     """A polygon found at a different threshold is a different claim and must not
     overwrite the original."""
-    tracks = [track(85, OrbitState.ASCENDING, [box(0, 0, 400, 400)]),
-              track(19, OrbitState.DESCENDING, [box(0, 0, 400, 400)])]
+    tracks = [
+        track(85, OrbitState.ASCENDING, [box(0, 0, 400, 400)]),
+        track(19, OrbitState.DESCENDING, [box(0, 0, 400, 400)]),
+    ]
     from ndip.application.detect import _grade_by_agreement
-    loose, _ = _grade_by_agreement(tracks, min_mapping_unit_m2=2_000.0, event_id=EVENT_ID,
-                                   fingerprint="threshold=2.0")
-    strict, _ = _grade_by_agreement(tracks, min_mapping_unit_m2=2_000.0, event_id=EVENT_ID,
-                                    fingerprint="threshold=4.0")
+
+    loose, _ = _grade_by_agreement(
+        tracks, min_mapping_unit_m2=2_000.0, event_id=EVENT_ID, fingerprint="threshold=2.0"
+    )
+    strict, _ = _grade_by_agreement(
+        tracks, min_mapping_unit_m2=2_000.0, event_id=EVENT_ID, fingerprint="threshold=4.0"
+    )
     assert loose[0].polygon_id != strict[0].polygon_id
