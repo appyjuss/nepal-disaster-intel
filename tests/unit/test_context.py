@@ -7,9 +7,9 @@ from datetime import date
 import numpy as np
 import pytest
 from affine import Affine
+from pyproj import Transformer
 from shapely.geometry import box
 from shapely.ops import transform as shp_transform
-from pyproj import Transformer
 
 from ndip.adapters.terrain.dem import TerrainGrid
 from ndip.application.context import MAX_DRAINAGE_SEARCH_M, build_context
@@ -94,5 +94,12 @@ def test_rainfall_is_summarised_once_and_shared_across_regions():
 
 def test_no_polygons_is_an_error_not_an_empty_result():
     with pytest.raises(LookupError):
-        build_context(EVENT_ID, EVENT_DATE, [], grid=grid(), rainfall_series=RAIN,
-                      drainage_wkb=[], projected_epsg=EPSG)
+        build_context(
+            EVENT_ID,
+            EVENT_DATE,
+            [],
+            grid=grid(),
+            rainfall_series=RAIN,
+            drainage_wkb=[],
+            projected_epsg=EPSG,
+        )
