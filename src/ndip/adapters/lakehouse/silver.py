@@ -89,3 +89,24 @@ class SilverWriter:
             updated=outcome.rows_updated,
         )
         return len(rows)
+
+
+def read_change_polygons(
+    catalog: Catalog, *, event_id: str, confidence: tuple[str, ...] = ("high",)
+) -> list[dict]:
+    """Silver polygons for one event, as plain records.
+
+    Gold reads silver rather than re-running detection, so exposure can be
+    recomputed against a new Overture release without touching any imagery.
+    """
+    table = catalog.load_table(CHANGE_POLYGONS)
+    rows = table.scan().to_arrow().to_pylist()
+    kept = [r for r in rows if r["event_id"] == event_id and r["confidence"] in confidence]
+    kept.sort(key=lambda r: r["area_m2"], reverse=True)
+    log.info(
+        "silver.change_polygons.read",
+        event_id=event_id,
+        confidence=list(confidence),
+        rows=len(kept),
+    )
+    return kept
