@@ -27,6 +27,7 @@ from ndip.adapters.lakehouse.schemas import (
     STAC_ITEMS_SCHEMA,
 )
 from ndip.adapters.stac.client import StacItem
+from ndip.domain.event import OrbitState, Scene
 from ndip.domain.precipitation import DailyRainfall
 
 log = structlog.get_logger(__name__)
@@ -125,3 +126,28 @@ def read_rainfall(catalog: Catalog, *, event_id: str) -> list[DailyRainfall]:
     series.sort(key=lambda d: d.on)
     log.info("bronze.rainfall.read", event_id=event_id, days=len(series))
     return series
+
+
+def read_scenes(catalog: Catalog, *, event_id: str, collection: str) -> list[Scene]:
+    """Acquisitions already landed in bronze, back as domain values.
+
+    Silver reads these rather than re-querying the catalogue. That is what makes the
+    dependency between the layers real: a rerun of detection uses the scenes that
+    were actually ingested, not whatever the remote catalogue happens to hold today.
+    """
+    rows = catalog.load_table(STAC_ITEMS).scan().to_arrow().to_pylist()
+    scenes = [
+        Scene(
+            item_id=r["item_id"],
+            collection=r["collection"],
+            acquired_at=r["acquired_at"],
+            orbit_state=OrbitState(r["orbit_state"]) if r["orbit_state"] else None,
+            relative_orbit=r["relative_orbit"],
+            cloud_cover=r["cloud_cover"],
+        )
+        for r in rows
+        if r["event_id"] == event_id and r["collection"] == collection
+    ]
+    scenes.sort(key=lambda s: s.acquired_at)
+    log.info("bronze.scenes.read", event_id=event_id, collection=collection, scenes=len(scenes))
+    return scenes
