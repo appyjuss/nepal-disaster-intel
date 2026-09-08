@@ -56,3 +56,15 @@ def buffer_metres(geometry: BaseGeometry, metres: float, *, projected_epsg: int)
     from shapely.ops import transform as _t
 
     return _t(to_deg, _t(to_m, geometry).buffer(metres))
+
+
+def zonal_values(array: np.ndarray, geometry: BaseGeometry, transform: object) -> np.ndarray:
+    """Every valid pixel inside a polygon.
+
+    Some statistics cannot be built from a mean. A compass bearing has to be
+    averaged as a vector, which needs the values themselves.
+    """
+    footprint = rasterize(
+        [(geometry, 1)], out_shape=array.shape, transform=transform, fill=0, dtype="uint8"
+    ).astype(bool)
+    return array[footprint & np.isfinite(array)]
