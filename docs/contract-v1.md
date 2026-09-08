@@ -71,6 +71,18 @@ Two further limitations this surfaced, on top of those above:
 - Track 121 covers only ~16% of the area, so its contribution is partial. Coverage is
   reported per track as `usable_px_pct` and should be read before trusting a track.
 
+## Exposure results (2026-09-07)
+
+All 16 corroborated regions assessed against Overture `2026-08-19.0` and WorldPop
+2020 constrained, 500 m buffer: **6430 buildings** and **411 road segments** inside the
+buffers, **14 of 16 regions with a bridge within 500 m**, and about **22 650 people** —
+that last figure indicative only, since the product sums ~20% above the national
+estimate and its ratio is stored per row. One region has nothing mapped near it at all.
+
+Building density inside the buffers runs ~420/km² against an area-wide 226/km²,
+which is the expected direction: detections sit on the inhabited valley floor while
+the wider area includes empty high mountains.
+
 ## Version ladder (not V1 scope, recorded so V1 does not paint us into a corner)
 
 V2 lakehouse + Spark, Nepal-wide · V3 historical disaster corpus · V4 ML susceptibility/impact

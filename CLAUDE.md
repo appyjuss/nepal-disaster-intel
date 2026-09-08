@@ -19,6 +19,7 @@ uv run ndip discover --bbox "w,s,e,n" -v   # override AOI
 uv run ndip ingest                         # discover, then land results in bronze
 uv run ndip detect                         # change detection -> silver.change_polygons
 uv run ndip detect --bbox "w,s,e,n" --no-write   # try a small area without persisting
+uv run ndip expose                         # exposure for corroborated changes -> gold.exposure
 ```
 
 The warehouse defaults to `data/warehouse` on the local filesystem with a SQLite
@@ -68,6 +69,12 @@ tells you within milliseconds whether the daemon or the CLI is at fault.
   AWS copies are addressed as `s3://`; GDAL then attempts a signed request and, with
   no credentials, hangs instead of failing. Ten minutes of no traffic and no error.
   `configure_gdal()` sets connect and read timeouts — call it before any raster read.
+- **WorldPop constrained sums ~20% above the UN estimate for Nepal.** That ratio is
+  stored on every gold row. Report population as indicative; never scale it silently.
+- **Overture is public S3 but the AWS default credential chain will try to sign it.**
+  Set empty `s3_access_key_id`/`s3_secret_access_key` in DuckDB for unsigned reads.
+- **Buffer in metres, never in degrees.** At 28N a degree of longitude is ~12% shorter
+  than a degree of latitude, so a degree buffer is an ellipse. `buffer_metres` projects.
 - **Give any silver/gold row an id derived from its content**, never a running index.
   Index ids collide across runs and the upsert quietly overwrites unrelated rows.
 - **Sentinel-1 arrives as several frames per acquisition**, sliced along the orbit
