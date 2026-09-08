@@ -86,9 +86,11 @@ tells you within milliseconds whether the daemon or the CLI is at fault.
 - **Give any silver/gold row an id derived from its content**, never a running index.
   Index ids collide across runs and the upsert quietly overwrites unrelated rows.
 - **Sentinel-1 arrives as several frames per acquisition**, sliced along the orbit
-  (you will see 00:18 and 00:19 on the same track). They are not duplicates. Pair
-  selection currently picks one frame arbitrarily; change detection will need to
-  mosaic the frames covering the AOI before differencing.
+  (you will see 00:18 and 00:19 on the same track). They are not duplicates, and one
+  of the two can miss the area entirely — a frame that looks perfectly valid and
+  contains nothing. `RtcLoader` keeps only frames covering at least 1% of the area and
+  mosaics them per acquisition day; `discover` still names a single representative
+  frame per pair, which is fine for reporting and is not what detection reads.
 
 ## Layering
 
