@@ -34,6 +34,8 @@ V1 **reconstructs**. It does not predict. Prediction is V4.
    index, and terrain stats (slope, aspect, elevation, distance-to-drainage) per polygon.
 5. Every gold row traces to source: `stac_item_id`s, acquisition datetimes, processing version.
 6. `mise run test` is green; the whole pipeline reruns from cold with one command.
+   **Met.** `mise run pipeline` rebuilt every table from a deleted warehouse in 133
+   seconds, reproducing the same 41 / 62 / 732 / 16 / 16 rows the staged runs produced.
 
 ## Explicitly out of scope for V1
 

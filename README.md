@@ -29,7 +29,7 @@ Sentinel-1 · Sentinel-2 · COP-DEM · ERA5 · Overture/OSM · WorldPop
 | V1 change detection — dual-geometry SAR, silver polygons | **working** |
 | V1 exposure — Overture + WorldPop, gold.exposure | **working** |
 | V1 event context — terrain, drainage, rainfall | **working** |
-| V1 one-command cold rerun | next |
+| V1 one-command cold rerun | **working** |
 | V2 lakehouse at Nepal scale (Spark) | planned |
 | V3 historical disaster corpus | planned |
 | V4 ML susceptibility / impact | planned |
@@ -40,8 +40,10 @@ Sentinel-1 · Sentinel-2 · COP-DEM · ERA5 · Overture/OSM · WorldPop
 ```bash
 mise run install
 mise run test
-uv run ndip discover   # what data exists for the event
-uv run ndip ingest     # land it in the bronze layer
+mise run pipeline      # bronze through gold, from nothing, in one command
 ```
+
+Or drive a stage at a time: `ndip discover`, `ndip ingest`, `ndip detect`,
+`ndip expose`, `ndip context`.
 
 See `CLAUDE.md` for commands and `docs/contract-v1.md` for what V1 does and does not do.

@@ -21,6 +21,9 @@ uv run ndip detect                         # change detection -> silver.change_p
 uv run ndip detect --bbox "w,s,e,n" --no-write   # try a small area without persisting
 uv run ndip expose                         # exposure for corroborated changes -> gold.exposure
 uv run ndip context                        # terrain + rainfall conditions -> gold.event_context
+
+mise run pipeline     # the whole thing, bronze through gold, in one command
+mise run dagster      # the same graph in a UI at localhost:3000
 ```
 
 The warehouse defaults to `data/warehouse` on the local filesystem with a SQLite
@@ -81,6 +84,12 @@ tells you within milliseconds whether the daemon or the CLI is at fault.
   reported every region at 0 m on flat ground. `build_context` now raises instead.
 - **Aspect is a bearing, so average it as a vector.** The arithmetic mean of 350 and 10
   is 180, pointing opposite to both. Flat cells carry no aspect at all, not north.
+- **`ndip.orchestration.definitions` cannot use `from __future__ import annotations`.**
+  Dagster resolves an asset's config class from the annotation at import time and a
+  string annotation defeats it, with an error that names the class rather than the cause.
+- **Only `bronze_observations` may touch the network.** Downstream assets read tables.
+  An asset that re-fetches its inputs does not depend on what it declares, and there is
+  a test in `tests/unit/test_orchestration.py` that fails if one starts to.
 - **A high-altitude radar darkening is probably wet snow, not a landslide.** Snow absorbs
   radar and darkens sharply. Check elevation before believing a steep-slope detection.
 - **Give any silver/gold row an id derived from its content**, never a running index.
