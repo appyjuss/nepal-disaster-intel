@@ -131,3 +131,31 @@ def utm_epsg(aoi: BBox) -> int:
     lon, lat = aoi.centroid
     zone = int((lon + 180.0) // 6.0) + 1
     return (32600 if lat >= 0 else 32700) + zone
+
+
+def load_dem_for_report(aoi: BBox, *, degrees_per_pixel: float = 0.0008) -> np.ndarray:
+    """Elevation on a geographic grid, for a shaded-relief backdrop.
+
+    Kept in degrees rather than metres because the page draws detections in
+    longitude and latitude, so a geographic grid needs no reprojection at draw time.
+    """
+    configure_gdal()
+    client = pystac_client.Client.open(PLANETARY_COMPUTER_STAC)
+    items = [
+        planetary_computer.sign(item)
+        for item in client.search(collections=[COP_DEM_COLLECTION], bbox=aoi.as_list()).items()
+    ]
+    if not items:
+        raise LookupError(f"no Copernicus DEM tiles cover {aoi.as_list()}")
+    cube = odc_load(
+        items,
+        bands=[DEM_BAND],
+        crs="EPSG:4326",
+        resolution=degrees_per_pixel,
+        bbox=aoi.as_list(),
+        chunks={},
+        dtype="float32",
+    )
+    elevation = cube[DEM_BAND].squeeze().compute().values
+    log.info("dem.report_grid.loaded", shape=list(elevation.shape))
+    return elevation

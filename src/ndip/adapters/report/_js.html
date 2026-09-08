@@ -1,0 +1,352 @@
+<script>
+(function(){
+"use strict";
+var D = window.__NDIP__;
+var SVGNS = "http://www.w3.org/2000/svg";
+function el(n,a){var e=document.createElementNS(SVGNS,n);for(var k in a){if(a[k]!==null&&a[k]!==undefined)e.setAttribute(k,a[k]);}return e;}
+function txt(s){return document.createTextNode(s);}
+
+var tip = document.getElementById("tip");
+function showTip(html,ev){tip.innerHTML=html;tip.classList.add("on");moveTip(ev);}
+function moveTip(ev){
+  var pad=14,w=tip.offsetWidth,h=tip.offsetHeight;
+  var x=ev.clientX+pad, y=ev.clientY+pad;
+  if(x+w>window.innerWidth-8)x=ev.clientX-w-pad;
+  if(y+h>window.innerHeight-8)y=ev.clientY-h-pad;
+  tip.style.left=x+"px";tip.style.top=y+"px";
+}
+function hideTip(){tip.classList.remove("on");}
+
+var AOI=D.aoi, W_=AOI[0], S_=AOI[1], E_=AOI[2], N_=AOI[3];
+var lonSpan=E_-W_, latSpan=N_-S_;
+var COS=Math.cos((S_+N_)/2*Math.PI/180);
+
+/* ---------- overview map ---------- */
+(function(){
+  var H=1000, W=Math.round(H*(lonSpan*COS)/latSpan);
+  var svg=document.getElementById("map");
+  svg.setAttribute("viewBox","0 0 "+W+" "+H);
+  svg.style.maxHeight="660px";
+  var X=function(lo){return (lo-W_)/lonSpan*W;}, Y=function(la){return (N_-la)/latSpan*H;};
+
+  svg.appendChild(el("image",{href:"data:image/png;base64,"+D.hillshade,x:0,y:0,width:W,height:H,
+    preserveAspectRatio:"none","class":"hill"}));
+  svg.appendChild(el("rect",{x:.5,y:.5,width:W-1,height:H-1,"class":"aoi"}));
+
+  var maxHa=Math.max.apply(null,D.polygons.map(function(p){return p.ha;}));
+  var g=el("g",{});
+  D.polygons.forEach(function(p,i){
+    var r=4+9*Math.sqrt(p.ha/maxHa), cx=X(p.lon), cy=Y(p.lat);
+    var wrap=el("g",{"class":"mk",tabindex:"0",role:"button",
+      "aria-label":p.ha+" hectares, "+p.db+" decibels, "+p.conf+" confidence"});
+    wrap.dataset.i=i;
+    if(p.conf==="high") wrap.appendChild(el("circle",{cx:cx,cy:cy,r:r+3.5,"class":"mkring"}));
+    wrap.appendChild(el("circle",{cx:cx,cy:cy,r:r,"class":"mkbody",
+      fill:p.db<0?"var(--dark)":"var(--bright)","fill-opacity":.8}));
+    wrap.appendChild(el("circle",{cx:cx,cy:cy,r:Math.max(r+6,13),"class":"hit"}));
+    g.appendChild(wrap);
+  });
+  svg.appendChild(g);
+
+  /* scale bar: 10 km */
+  var km10=10/ (111.32*COS) /lonSpan*W;
+  var sb=el("g",{transform:"translate("+(W-km10-18)+","+(H-26)+")"});
+  sb.appendChild(el("line",{x1:0,y1:0,x2:km10,y2:0,"class":"axis","stroke-width":2}));
+  sb.appendChild(el("line",{x1:0,y1:-4,x2:0,y2:4,"class":"axis","stroke-width":2}));
+  sb.appendChild(el("line",{x1:km10,y1:-4,x2:km10,y2:4,"class":"axis","stroke-width":2}));
+  var t=el("text",{x:km10/2,y:-8,"text-anchor":"middle","class":"ax-emph"});t.appendChild(txt("10 km"));
+  sb.appendChild(t);
+  svg.appendChild(sb);
+  window.__mapG=g;
+})();
+
+/* ---------- inset: true-shape southern cluster ---------- */
+(function(){
+  var pts=D.polygons.filter(function(p){return p.lat<27.88;});
+  if(!pts.length)pts=D.polygons.slice(0,6);
+  var lo0=1e9,lo1=-1e9,la0=1e9,la1=-1e9;
+  pts.forEach(function(p){p.rings.forEach(function(r){r.forEach(function(c){
+    if(c[0]<lo0)lo0=c[0];if(c[0]>lo1)lo1=c[0];if(c[1]<la0)la0=c[1];if(c[1]>la1)la1=c[1];});});});
+  var padL=(lo1-lo0)*0.18+0.004, padA=(la1-la0)*0.18+0.004;
+  lo0-=padL;lo1+=padL;la0-=padA;la1+=padA;
+  var iLon=lo1-lo0, iLat=la1-la0;
+  var W=620, H=Math.round(W*(iLat/(iLon*COS)));
+  var svg=document.getElementById("inset");
+  svg.setAttribute("viewBox","0 0 "+W+" "+H);
+  svg.style.overflow="hidden";
+  var X=function(lo){return (lo-lo0)/iLon*W;}, Y=function(la){return (la1-la)/iLat*H;};
+
+  var sx=W/iLon, sy=H/iLat;
+  svg.appendChild(el("image",{href:"data:image/png;base64,"+D.hillshade,
+    x:-(lo0-W_)*sx, y:-(N_-la1)*sy, width:lonSpan*sx, height:latSpan*sy,
+    preserveAspectRatio:"none","class":"hill"}));
+  svg.appendChild(el("rect",{x:.5,y:.5,width:W-1,height:H-1,"class":"aoi"}));
+
+  pts.forEach(function(p){
+    p.rings.forEach(function(r){
+      var d="M"+r.map(function(c){return X(c[0]).toFixed(1)+" "+Y(c[1]).toFixed(1);}).join("L")+"Z";
+      svg.appendChild(el("path",{d:d,"class":p.db<0?"pd":"pb"}));
+    });
+  });
+  var note=document.getElementById("inset-note");
+  if(note){
+    var hi=pts.filter(function(p){return p.conf==="high";}).length;
+    var wkm=(iLon*111.32*COS).toFixed(0), hkm=(iLat*111.32).toFixed(0);
+    note.innerHTML = hi+" of the "+D.facts.high+" corroborated detections fall inside this "+
+      "<span class='mono'>"+wkm+" \u00d7 "+hkm+" km</span> window along the valley floor. At "+
+      "full-area scale a three-hectare polygon is smaller than one screen pixel, which is why the "+
+      "overview uses markers and this panel does not.";
+  }
+  var km1=1/(111.32*COS)/iLon*W;
+  var sb=el("g",{transform:"translate("+(W-km1-16)+","+(H-18)+")"});
+  sb.appendChild(el("line",{x1:0,y1:0,x2:km1,y2:0,"class":"axis","stroke-width":2}));
+  sb.appendChild(el("line",{x1:0,y1:-4,x2:0,y2:4,"class":"axis","stroke-width":2}));
+  sb.appendChild(el("line",{x1:km1,y1:-4,x2:km1,y2:4,"class":"axis","stroke-width":2}));
+  var t=el("text",{x:km1/2,y:-7,"text-anchor":"middle","class":"ax-emph"});t.appendChild(txt("1 km"));
+  sb.appendChild(t);svg.appendChild(sb);
+})();
+
+/* ---------- rainfall ---------- */
+(function(){
+  var d=D.rain, n=d.length;
+  var W=1100,H=280,mL=44,mR=16,mT=26,mB=40;
+  var pw=W-mL-mR, ph=H-mT-mB;
+  var svg=document.getElementById("rain");
+  svg.setAttribute("viewBox","0 0 "+W+" "+H);
+  var max=Math.max.apply(null,d.map(function(r){return r.mm;}));
+  var top=Math.ceil(max/10)*10;
+  var Y=function(v){return mT+ph-(v/top)*ph;};
+  var bw=pw/n, bar=Math.max(3,bw-3);
+
+  for(var t=0;t<=top;t+=10){
+    svg.appendChild(el("line",{x1:mL,y1:Y(t),x2:mL+pw,y2:Y(t),"class":t===0?"axis":"grid"}));
+    var lb=el("text",{x:mL-8,y:Y(t)+3.5,"text-anchor":"end","class":"ax-txt"});
+    lb.appendChild(txt(t));svg.appendChild(lb);
+  }
+  var yl=el("text",{x:mL-8,y:mT-10,"text-anchor":"end","class":"ax-txt"});
+  yl.appendChild(txt("mm"));svg.appendChild(yl);
+
+  var evIdx=d.findIndex(function(r){return r.d==="2026-08-26";});
+  d.forEach(function(r,i){
+    var x=mL+i*bw+(bw-bar)/2, h=Math.max(r.mm>0?1.5:0,(r.mm/top)*ph);
+    var g=el("g",{});
+    g.appendChild(el("rect",{x:x,y:Y(r.mm),width:bar,height:h,rx:1.5,
+      "class":i===evIdx?"bar-ev":"bar"}));
+    g.appendChild(el("rect",{x:mL+i*bw,y:mT,width:bw,height:ph,"class":"hit"}));
+    g.addEventListener("mouseenter",function(e){showTip("<b>"+r.d+"</b><br>"+r.mm+" mm",e);});
+    g.addEventListener("mousemove",moveTip);
+    g.addEventListener("mouseleave",hideTip);
+    svg.appendChild(g);
+    if(i%7===0||i===n-1){
+      var xl=el("text",{x:mL+i*bw+bw/2,y:mT+ph+16,"text-anchor":"middle","class":"ax-txt"});
+      xl.appendChild(txt(r.d.slice(5).replace("-","/")));svg.appendChild(xl);
+    }
+  });
+  if(evIdx>=0){
+    var ex=mL+evIdx*bw+bw/2;
+    svg.appendChild(el("line",{x1:ex,y1:mT-6,x2:ex,y2:mT+ph,"class":"evline"}));
+    var el2=el("text",{x:ex,y:mT-11,"text-anchor":"middle","class":"ax-emph"});
+    el2.appendChild(txt("event \u2014 2.9 mm"));svg.appendChild(el2);
+  }
+  var mi=d.reduce(function(a,r,i){return r.mm>d[a].mm?i:a;},0);
+  var mx=mL+mi*bw+bw/2;
+  var ml=el("text",{x:mx,y:Y(d[mi].mm)-7,"text-anchor":"middle","class":"ax-emph"});
+  ml.appendChild(txt(d[mi].mm+" mm"));svg.appendChild(ml);
+})();
+
+/* ---------- cloud cover ---------- */
+(function(){
+  var d=D.optical;
+  var W=1100,H=250,mL=44,mR=16,mT=22,mB=52;
+  var pw=W-mL-mR, ph=H-mT-mB;
+  var svg=document.getElementById("cloud");
+  svg.setAttribute("viewBox","0 0 "+W+" "+H);
+  var days=d.map(function(r){return Date.parse(r.t);});
+  var all=days.concat(D.radar.map(function(r){return Date.parse(r.t);}));
+  var t0=Math.min.apply(null,all), t1=Math.max.apply(null,all);
+  var X=function(t){return mL+(t-t0)/(t1-t0)*pw;}, Y=function(v){return mT+ph-(v/100)*ph;};
+
+  [0,25,50,75,100].forEach(function(v){
+    svg.appendChild(el("line",{x1:mL,y1:Y(v),x2:mL+pw,y2:Y(v),"class":v===0?"axis":"grid"}));
+    var lb=el("text",{x:mL-8,y:Y(v)+3.5,"text-anchor":"end","class":"ax-txt"});
+    lb.appendChild(txt(v));svg.appendChild(lb);
+  });
+  var yl=el("text",{x:mL-8,y:mT-8,"text-anchor":"end","class":"ax-txt"});
+  yl.appendChild(txt("% cloud"));svg.appendChild(yl);
+
+  svg.appendChild(el("line",{x1:mL,y1:Y(40),x2:mL+pw,y2:Y(40),"class":"thr"}));
+  var tl=el("text",{x:mL+pw,y:Y(40)-7,"text-anchor":"end","class":"ax-emph"});
+  tl.appendChild(txt("40% \u2014 above this, optical shows cloud, not ground"));svg.appendChild(tl);
+
+  d.forEach(function(r){
+    var g=el("g",{});
+    g.appendChild(el("circle",{cx:X(Date.parse(r.t)),cy:Y(r.cloud),r:4.5,"class":"dot"}));
+    g.appendChild(el("circle",{cx:X(Date.parse(r.t)),cy:Y(r.cloud),r:11,"class":"hit"}));
+    g.addEventListener("mouseenter",function(e){
+      showTip("<b>Sentinel-2 \u00b7 "+r.t+"</b><br>"+r.cloud+"% cloud",e);});
+    g.addEventListener("mousemove",moveTip);
+    g.addEventListener("mouseleave",hideTip);
+    svg.appendChild(g);
+  });
+
+  var ry=mT+ph+20;
+  var rl=el("text",{x:mL-8,y:ry+4,"text-anchor":"end","class":"ax-txt"});
+  rl.appendChild(txt("radar"));svg.appendChild(rl);
+  D.radar.forEach(function(r){
+    var g=el("g",{});
+    var x=X(Date.parse(r.t));
+    g.appendChild(el("line",{x1:x,y1:ry-5,x2:x,y2:ry+5,"class":"rug"}));
+    g.appendChild(el("rect",{x:x-7,y:ry-9,width:14,height:18,"class":"hit"}));
+    g.addEventListener("mouseenter",function(e){
+      showTip("<b>Sentinel-1 \u00b7 "+r.t+"</b><br>track "+r.track+" \u00b7 "+r.orbit,e);});
+    g.addEventListener("mousemove",moveTip);
+    g.addEventListener("mouseleave",hideTip);
+    svg.appendChild(g);
+  });
+  var cap=el("text",{x:mL,y:ry+26,"class":"ax-txt"});
+  cap.appendChild(txt("every Sentinel-1 pass is usable \u2014 radar does not care about cloud"));
+  svg.appendChild(cap);
+
+  [t0,t1].forEach(function(t,i){
+    var lb=el("text",{x:X(t),y:mT+ph+16,"text-anchor":i?"end":"start","class":"ax-txt"});
+    lb.appendChild(txt(new Date(t).toISOString().slice(0,10)));svg.appendChild(lb);
+  });
+})();
+
+/* ---------- data-driven prose and tiles ---------- */
+(function(){
+  var f=D.facts;
+  function n(x){ var v=Math.round(Number(x));
+    return v<10000 ? String(v) : String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+  function set(id,txt){var e=document.getElementById(id); if(e) e.textContent=txt;}
+  set("f-high", f.high); set("f-tracks", f.tracks); set("f-total", n(f.total));
+  set("table-note", f.graded+" of "+n(f.total)+" \u00b7 hover a row to locate it");
+  set("f-footer","bronze "+n(f.bronze_rows)+" rows \u00b7 silver "+n(f.total)+
+      " rows \u00b7 gold "+n(f.high)+" rows");
+  set("f-params","threshold "+f.threshold_db.toFixed(1)+" dB \u00b7 MMU "+n(f.mmu_m2)+
+      " m\u00b2 \u00b7 "+f.band.toUpperCase()+" \u00b7 "+n(f.resolution_m)+" m");
+
+  var lede=document.getElementById("finding-lede");
+  if(lede){
+    lede.textContent = f.pattern === "saturation"
+      ? "The rain did not fall on the day. It had been falling for a fortnight, and "+
+        (f.high_alt ? "all but one corroborated detection sits" : "every corroborated detection sits")+
+        " on the valley floor, not the slopes."
+      : "What the radar saw, and what stood in the way of it.";
+  }
+
+  var fb=document.getElementById("finding-body");
+  if(fb){
+    fb.innerHTML =
+      "Event-day rainfall was <span class='mono'>"+f.rain_event_day.toFixed(1)+" mm</span>. The preceding "+
+      "thirty days delivered <span class='mono'>"+n(f.rain_30d)+" mm</span>, with an antecedent index of "+
+      "<span class='mono'>"+n(f.api)+" mm</span> \u2014 a "+f.pattern+" pattern, not a cloudburst. Of "+
+      n(f.total)+" detected regions, <b>"+f.high+"</b> were seen from both an ascending and a descending "+
+      "radar pass. "+(f.high_all_darkening
+        ? "Every one of them is a <b>darkening</b> of "+Math.abs(f.high_db_max).toFixed(1)+" to "+
+          Math.abs(f.high_db_min).toFixed(1)+" decibels"
+        : "Most are a <b>darkening</b>")+
+      ", the signature of a smoother surface \u2014 water or fresh mud. "+
+      f.valley_floor+" of them sit between "+n(f.elev_low_min)+" and "+n(f.elev_low_max)+
+      " m, within "+n(f.drain_max_low)+" m of a mapped channel."+
+      (f.high_alt ? " One sits at <span class='mono'>"+n(f.high_alt_elev)+" m</span> on a "+
+        f.high_alt_slope.toFixed(0)+"\u00b0 face with nothing mapped near it \u2014 at that elevation a "+
+        "radar darkening is more likely wet snow than a slope failure." : "");
+  }
+
+  var tiles=document.getElementById("exposure-tiles");
+  if(tiles && f.exposure){
+    var e=f.exposure;
+    var items=[
+      ["Buildings", n(e.buildings), "inside the 500 m buffers"],
+      ["Road segments", n(e.roads), "including "+e.bridges+" bridge crossings"],
+      ["People", n(e.people), "indicative; the product runs ~"+Math.round((e.bias-1)*100)+"% high"],
+      ["Nothing nearby", e.empty+" of "+f.high, "regions with no mapped feature at all"]
+    ];
+    tiles.innerHTML = items.map(function(it){
+      return '<div class="card"><span class="k">'+it[0]+'</span>'+
+             '<b style="font-family:var(--font-d);font-size:30px;line-height:1;'+
+             'font-variant-numeric:tabular-nums">'+it[1]+'</b>'+
+             '<p style="margin:0">'+it[2]+'</p></div>';
+    }).join("");
+    set("exp-note","Overture "+e.release+" \u00b7 "+n(e.buffer_m)+" m buffer");
+    var note=document.getElementById("exposure-note");
+    if(note) note.textContent =
+      "Exposure is not damage. Nothing here says a road was cut or a building fell \u2014 only that "+
+      "it stood inside a changed region or within reach of one. "+e.with_bridge+" of the "+f.high+
+      " corroborated regions have a bridge within the buffer, which on a river corridor is the figure "+
+      "that decides whether a valley stays connected.";
+  }
+})();
+
+/* ---------- ledger (fills the right column) ---------- */
+(function(){
+  var host=document.getElementById("ledger"); if(!host)return;
+  var c=D.counts, g=D.polygons;
+  var dark=g.filter(function(p){return p.db<0;}).length;
+  var brt=g.length-dark;
+  var flat=g.filter(function(p){return p.slope<=8;}).length;
+  function bar(label,val,total,cls){
+    var pct=total? (val/total*100):0;
+    return '<div class="lg-row"><span class="lg-k">'+label+'</span>'+
+      '<span class="lg-track"><span class="lg-fill '+cls+'" style="width:'+pct.toFixed(1)+'%"></span></span>'+
+      '<span class="lg-v mono">'+val+'</span></div>';
+  }
+  host.innerHTML =
+    '<div class="lg-grp"><span class="k">Regions by grade</span>'+
+      bar("corroborated",c.high,c.total,"f-flag")+
+      bar("single, strong",c.medium,c.total,"f-mut")+
+      bar("single, weak",c.low,c.total,"f-hair")+
+    '</div>'+
+    '<div class="lg-grp"><span class="k">Graded regions by signature</span>'+
+      bar("darkening",dark,g.length,"f-dark")+
+      bar("brightening",brt,g.length,"f-bright")+
+    '</div>'+
+    '<p class="lg-note">'+flat+' of '+g.length+' graded detections sit on ground under 8\u00b0 \u2014 '+
+      'the valley floor, where smoothing means water or mud rather than slope failure.</p>';
+})();
+
+/* ---------- table + linking ---------- */
+(function(){
+  var tb=document.getElementById("rows");
+  var marks=window.__mapG?window.__mapG.querySelectorAll(".mk"):[];
+  D.polygons.forEach(function(p,i){
+    var tr=document.createElement("tr");
+    var sw='<span class="swatch" style="background:'+(p.db<0?"var(--dark)":"var(--bright)")+'"></span>';
+    var dash=function(v,d){return (v===null||v===undefined)?"\u2014":Number(v).toFixed(d||0);};
+    tr.innerHTML =
+      '<td class="num">'+sw+p.id+'</td>'+
+      '<td class="num">'+p.ha.toFixed(1)+'</td>'+
+      '<td class="num">'+dash(p.elev)+'</td>'+
+      '<td class="num">'+p.slope.toFixed(0)+'</td>'+
+      '<td class="num">'+(p.db>0?"+":"")+p.db.toFixed(1)+'</td>'+
+      '<td class="num">'+dash(p.drain)+'</td>'+
+      '<td class="num">'+dash(p.buildings)+'</td>'+
+      '<td class="num">'+dash(p.bridges)+'</td>'+
+      '<td class="num">'+dash(p.people)+'</td>'+
+      '<td class="num">'+p.seen+'</td>'+
+      '<td><span class="pill '+(p.conf==="high"?"p-high":"p-med")+'">'+p.conf+'</span></td>';
+    function on(){
+      tr.classList.add("sel");
+      for(var j=0;j<marks.length;j++) if(j!==i) marks[j].classList.add("dim");
+    }
+    function off(){
+      tr.classList.remove("sel");
+      for(var j=0;j<marks.length;j++) marks[j].classList.remove("dim");
+    }
+    tr.addEventListener("mouseenter",on);
+    tr.addEventListener("mouseleave",off);
+    tb.appendChild(tr);
+    if(marks[i]){
+      marks[i].addEventListener("mouseenter",function(e){
+        on();
+        showTip("<b>"+p.ha.toFixed(1)+" ha</b> \u00b7 "+p.conf+"<br>"+
+          (p.db>0?"+":"")+p.db.toFixed(1)+" dB \u00b7 slope "+p.slope.toFixed(0)+"\u00b0<br>"+
+          "seen by "+p.seen+"<br>"+p.lat.toFixed(4)+", "+p.lon.toFixed(4),e);});
+      marks[i].addEventListener("mousemove",moveTip);
+      marks[i].addEventListener("mouseleave",function(){off();hideTip();});
+    }
+  });
+})();
+})();
+</script>
