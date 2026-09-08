@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import structlog
+from pyproj import Transformer
 from rasterio.features import rasterize, shapes
 from shapely.geometry import shape as to_shape
 from shapely.geometry.base import BaseGeometry
@@ -39,3 +40,19 @@ def zonal_mean(
     if values.size == 0:
         return float("nan")
     return float(np.mean(np.abs(values) if absolute else values))
+
+
+def buffer_metres(geometry: BaseGeometry, metres: float, *, projected_epsg: int) -> BaseGeometry:
+    """Buffer a WGS84 geometry by a true distance and return it in WGS84.
+
+    Buffering in degrees would be wrong in both axes and wrong by different amounts:
+    at this latitude a degree of longitude is about 12% shorter than a degree of
+    latitude, so a "0.005 degree" buffer is an ellipse, not a circle.
+    """
+    if metres <= 0:
+        raise ValueError("buffer distance must be positive")
+    to_m = Transformer.from_crs("EPSG:4326", f"EPSG:{projected_epsg}", always_xy=True).transform
+    to_deg = Transformer.from_crs(f"EPSG:{projected_epsg}", "EPSG:4326", always_xy=True).transform
+    from shapely.ops import transform as _t
+
+    return _t(to_deg, _t(to_m, geometry).buffer(metres))
