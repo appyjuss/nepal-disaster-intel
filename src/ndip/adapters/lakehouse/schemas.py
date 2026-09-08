@@ -28,12 +28,14 @@ STAC_ITEMS = f"{BRONZE_NAMESPACE}.stac_items"
 RAINFALL_DAILY = f"{BRONZE_NAMESPACE}.rainfall_daily"
 CHANGE_POLYGONS = f"{SILVER_NAMESPACE}.change_polygons"
 EXPOSURE = f"{GOLD_NAMESPACE}.exposure"
+EVENT_CONTEXT = f"{GOLD_NAMESPACE}.event_context"
 
 # Natural keys. Re-ingesting the same event must update these rows, not add to them.
 STAC_ITEMS_KEY = ["event_id", "collection", "item_id"]
 RAINFALL_DAILY_KEY = ["event_id", "observed_on"]
 CHANGE_POLYGONS_KEY = ["event_id", "polygon_id"]
 EXPOSURE_KEY = ["event_id", "polygon_id"]
+EVENT_CONTEXT_KEY = ["event_id", "polygon_id"]
 
 STAC_ITEMS_SCHEMA = Schema(
     NestedField(1, "event_id", StringType(), required=True),
@@ -142,5 +144,36 @@ EXPOSURE_SCHEMA = Schema(
 )
 
 EXPOSURE_PARTITION = PartitionSpec(
+    PartitionField(source_id=1, field_id=1000, transform=IdentityTransform(), name="event_id"),
+)
+
+
+# Rainfall is shared across the area because the reanalysis grid is far coarser than
+# the gap between two polygons; terrain is measured inside each one. Both travel on
+# the same row so a reader never has to join to interpret a figure.
+EVENT_CONTEXT_SCHEMA = Schema(
+    NestedField(1, "event_id", StringType(), required=True),
+    NestedField(2, "polygon_id", StringType(), required=True),
+    NestedField(3, "event_date", DateType(), required=True),
+    NestedField(4, "elevation_m", DoubleType(), required=True),
+    NestedField(5, "slope_deg", DoubleType(), required=True),
+    NestedField(6, "aspect_deg", DoubleType(), required=False),
+    NestedField(7, "aspect_cardinal", StringType(), required=True),
+    NestedField(8, "distance_to_drainage_m", DoubleType(), required=True),
+    NestedField(9, "precipitation_event_day_mm", DoubleType(), required=True),
+    NestedField(10, "precipitation_7d_mm", DoubleType(), required=True),
+    NestedField(11, "precipitation_14d_mm", DoubleType(), required=True),
+    NestedField(12, "precipitation_30d_mm", DoubleType(), required=True),
+    NestedField(13, "antecedent_index_mm", DoubleType(), required=True),
+    NestedField(14, "rainfall_pattern", StringType(), required=True),
+    NestedField(15, "rainfall_source", StringType(), required=True),
+    NestedField(16, "rainfall_grid_km", DoubleType(), required=True),
+    NestedField(17, "terrain_source", StringType(), required=True),
+    NestedField(18, "drainage_source", StringType(), required=True),
+    NestedField(19, "built_at", TimestamptzType(), required=True),
+    identifier_field_ids=[],
+)
+
+EVENT_CONTEXT_PARTITION = PartitionSpec(
     PartitionField(source_id=1, field_id=1000, transform=IdentityTransform(), name="event_id"),
 )

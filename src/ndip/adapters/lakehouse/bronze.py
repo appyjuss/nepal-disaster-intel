@@ -112,3 +112,16 @@ class BronzeWriter:
             updated=result.rows_updated,
         )
         return len(rows)
+
+
+def read_rainfall(catalog: Catalog, *, event_id: str) -> list[DailyRainfall]:
+    """The daily series already landed in bronze, back as domain values."""
+    rows = catalog.load_table(RAINFALL_DAILY).scan().to_arrow().to_pylist()
+    series = [
+        DailyRainfall(on=r["observed_on"], precipitation_mm=r["precipitation_mm"])
+        for r in rows
+        if r["event_id"] == event_id
+    ]
+    series.sort(key=lambda d: d.on)
+    log.info("bronze.rainfall.read", event_id=event_id, days=len(series))
+    return series
