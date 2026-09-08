@@ -19,6 +19,7 @@ def test_every_stage_of_the_pipeline_is_an_asset():
         "silver_change_polygons",
         "gold_exposure",
         "gold_event_context",
+        "report_page",
     }
 
 
@@ -36,6 +37,12 @@ def test_both_gold_tables_hang_off_silver_and_not_off_each_other():
     assert p["gold_event_context"] == {"silver_change_polygons"}
 
 
+def test_the_report_reads_both_gold_tables_and_nothing_earlier():
+    """The page must not reach past gold. Anything it re-derives from silver would be
+    a second implementation of a rule that already has one."""
+    assert parents()["report_page"] == {"gold_exposure", "gold_event_context"}
+
+
 def test_only_the_first_asset_reaches_outside_the_lakehouse():
     """Downstream assets read tables. If one starts calling a remote catalogue the
     dependency it declares stops being the thing it actually depends on."""
@@ -43,7 +50,7 @@ def test_only_the_first_asset_reaches_outside_the_lakehouse():
 
     from ndip.orchestration import definitions
 
-    for name in ("silver_change_polygons", "gold_exposure", "gold_event_context"):
+    for name in ("silver_change_polygons", "gold_exposure", "gold_event_context", "report_page"):
         body = inspect.getsource(getattr(definitions, name).op.compute_fn.decorated_fn)
         assert "StacSearch" not in body, f"{name} re-queries the STAC catalogue"
         assert "discover(" not in body, f"{name} re-runs discovery"

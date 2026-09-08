@@ -20,8 +20,14 @@ from ndip.adapters.lakehouse.silver import SilverWriter, read_change_polygons
 from ndip.adapters.osm.overture import DEFAULT_RELEASE, ensure_extract, load_drainage
 from ndip.adapters.population.worldpop import ensure_raster
 from ndip.adapters.raster.rtc import DEFAULT_RESOLUTION_M, RtcLoader
+from ndip.adapters.report.build import build_payload, hillshade_png_base64, read_inputs, render
 from ndip.adapters.stac.client import EARTH_SEARCH, S1_GRD, StacSearch
-from ndip.adapters.terrain.dem import load_slope_degrees, load_terrain_grid, utm_epsg
+from ndip.adapters.terrain.dem import (
+    load_dem_for_report,
+    load_slope_degrees,
+    load_terrain_grid,
+    utm_epsg,
+)
 from ndip.adapters.weather.open_meteo import NOMINAL_GRID_KM, fetch_daily_rainfall
 from ndip.adapters.weather.open_meteo import SOURCE_ID as RAINFALL_SOURCE
 from ndip.application.context import build_context
@@ -45,6 +51,7 @@ class PipelineConfig(Config):
     buffer_m: float = DEFAULT_BUFFER_M
     overture_release: str = DEFAULT_RELEASE
     confidence: str = "high"
+    report_path: str = "docs/trishuli-report.html"
 
 
 def _event(config: PipelineConfig):
@@ -203,6 +210,47 @@ def gold_event_context(context: AssetExecutionContext, config: PipelineConfig) -
     )
 
 
+@asset(
+    group_name="report",
+    deps=[gold_exposure, gold_event_context],
+    description="A self-contained page reading gold, regenerated with the pipeline",
+)
+def report_page(context: AssetExecutionContext, config: PipelineConfig) -> MaterializeResult:
+    event = _event(config)
+    inputs = read_inputs(_catalog(), event)
+    if not inputs.polygons:
+        raise ValueError(f"nothing to report for {event.event_id}")
+
+    payload = build_payload(
+        event,
+        inputs,
+        hillshade=hillshade_png_base64(load_dem_for_report(event.aoi)),
+        bronze_rows=len(inputs.radar) + len(inputs.optical) + len(inputs.rainfall),
+        threshold_db=config.threshold_db,
+        min_area_m2=config.min_area_m2,
+        band=config.band,
+        resolution_m=float(config.resolution_m),
+        buffer_m=config.buffer_m,
+        overture_release=config.overture_release,
+    )
+    written = render(payload, Path(config.report_path))
+    size_kb = round(written.stat().st_size / 1024)
+    context.log.info(f"report written to {written} ({size_kb} KB)")
+    return MaterializeResult(
+        metadata={
+            "path": str(written),
+            "size_kb": size_kb,
+            "regions_shown": len(payload["polygons"]),
+        }
+    )
+
+
 defs = Definitions(
-    assets=[bronze_observations, silver_change_polygons, gold_exposure, gold_event_context]
+    assets=[
+        bronze_observations,
+        silver_change_polygons,
+        gold_exposure,
+        gold_event_context,
+        report_page,
+    ]
 )
