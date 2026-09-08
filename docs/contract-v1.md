@@ -106,6 +106,33 @@ The honest V1 conclusion is that the pipeline reliably finds *surface change* an
 grades it well, and that separating flood, river variation and snow from slope failure
 needs evidence this pipeline does not yet carry. That is a V4 question, not a V1 one.
 
+## Validation (2026-09-07)
+
+Two checks were run to ask whether the 16 corroborated detections mean anything.
+
+**Control window.** The identical pipeline — same parameters, same three tracks, same
+12-day spans, same area — run over a window entirely *before* the event (synthetic event
+date 2026-08-15, pairs 08-12/08-24, 08-04/08-16, 08-07/08-19) produced **1 corroborated
+detection against the event's 16**. Raw per-track counts were comparable (494 + 687
+control against 586 + 809 event), so the discrimination comes almost entirely from the
+cross-geometry agreement rule rather than from the threshold. That is the design
+decision being validated. The single control detection sits at 28.34 N on a 38.8 degree
+slope at high elevation with -6.66 dB — the same wet-snow signature — so the true floor
+may be zero. Caveat: n=1 window; this rules out "the pipeline always finds 16", it does
+not put an error bar on the floor.
+
+**Cross-polarisation check.** Re-running the event window on VH instead of VV, an
+independent measurement of the same ground at the same instants, gave 49 corroborated
+regions of 503 graded. Of the 16 VV regions, **14 intersect a VH corroborated region and
+15 of 16 are within 100 m of one**, with median areal overlap ~68%. A chance baseline
+(the VH corroborated union covers 0.03% of the area; 200 random shuffles of the 16 VV
+regions) averages 0.05 hits. The agreement is not a footprint artefact.
+
+The 6822 m region is matched by VH at 45.9 degrees and -4.82 dB. That confirms the
+darkening is real ground signal rather than a single-channel artefact — but it does not
+clear it of being snow, because wet snow absorbs in both polarisations and so predicts
+exactly this agreement. Confirmed signal, unconfirmed cause.
+
 ## Version ladder (not V1 scope, recorded so V1 does not paint us into a corner)
 
 V2 lakehouse + Spark, Nepal-wide · V3 historical disaster corpus · V4 ML susceptibility/impact

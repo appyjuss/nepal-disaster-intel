@@ -22,7 +22,7 @@ uv run ndip detect --bbox "w,s,e,n" --no-write   # try a small area without pers
 uv run ndip expose                         # exposure for corroborated changes -> gold.exposure
 uv run ndip context                        # terrain + rainfall conditions -> gold.event_context
 
-mise run pipeline     # the whole thing, bronze through gold, in one command
+mise run pipeline     # the whole thing, bronze through gold to the report, one command
 mise run dagster      # the same graph in a UI at localhost:3000
 ```
 
@@ -92,6 +92,10 @@ tells you within milliseconds whether the daemon or the CLI is at fault.
   a test in `tests/unit/test_orchestration.py` that fails if one starts to.
 - **A high-altitude radar darkening is probably wet snow, not a landslide.** Snow absorbs
   radar and darkens sharply. Check elevation before believing a steep-slope detection.
+  VH agreement does not clear it: wet snow absorbs in both polarisations, so cross-channel
+  agreement is what snow predicts too.
+- **The report page reads gold and only gold.** Anything it re-derives from silver becomes
+  a second implementation of a rule that already has one, and the two will drift.
 - **Give any silver/gold row an id derived from its content**, never a running index.
   Index ids collide across runs and the upsert quietly overwrites unrelated rows.
 - **Sentinel-1 arrives as several frames per acquisition**, sliced along the orbit
