@@ -17,10 +17,16 @@ from ndip.adapters.lakehouse.bronze import BronzeWriter, read_rainfall, read_sce
 from ndip.adapters.lakehouse.catalog import build_catalog
 from ndip.adapters.lakehouse.gold import GoldWriter
 from ndip.adapters.lakehouse.silver import SilverWriter, read_change_polygons
-from ndip.adapters.osm.overture import DEFAULT_RELEASE, ensure_extract, load_drainage
+from ndip.adapters.osm.overture import (
+    DEFAULT_RELEASE,
+    OVERTURE_BUCKET,
+    ensure_extract,
+    load_drainage,
+)
 from ndip.adapters.population.worldpop import ensure_raster
 from ndip.adapters.raster.rtc import DEFAULT_RESOLUTION_M, RtcLoader
 from ndip.adapters.report.build import build_payload, hillshade_png_base64, read_inputs, render
+from ndip.adapters.report.context_layers import read_map_context, read_places
 from ndip.adapters.stac.client import EARTH_SEARCH, S1_GRD, StacSearch
 from ndip.adapters.terrain.dem import (
     load_dem_for_report,
@@ -221,9 +227,14 @@ def report_page(context: AssetExecutionContext, config: PipelineConfig) -> Mater
     if not inputs.polygons:
         raise ValueError(f"nothing to report for {event.event_id}")
 
+    extract_dir = _cache() / "overture" / config.overture_release
+    layers = read_map_context(extract_dir, event.aoi)
+    layers["places"] = read_places(extract_dir, event.aoi, OVERTURE_BUCKET, config.overture_release)
+
     payload = build_payload(
         event,
         inputs,
+        context_layers=layers,
         hillshade=hillshade_png_base64(load_dem_for_report(event.aoi)),
         bronze_rows=len(inputs.radar) + len(inputs.optical) + len(inputs.rainfall),
         threshold_db=config.threshold_db,

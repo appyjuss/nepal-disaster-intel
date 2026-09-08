@@ -79,10 +79,10 @@ section{margin-bottom:44px}
 .panel-h .s{font-family:var(--font-m);font-size:11px;color:var(--muted);margin-left:auto}
 .panel-b{padding:14px 16px 16px}
 svg{display:block;width:100%;height:auto;overflow:visible}
-.hill{filter:contrast(.82) brightness(1.06)}
+.hill{filter:saturate(.92)}
 :root[data-theme="dark"] .hill,
-:root:not([data-theme="light"]) .hill{filter:contrast(.9) brightness(.52) invert(0)}
-@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .hill{filter:contrast(.82) brightness(1.06)}}
+:root:not([data-theme="light"]) .hill{filter:saturate(.85) brightness(.72)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]) .hill{filter:saturate(.92)}}
 .mk{cursor:pointer;transition:opacity .12s}
 .mk:focus-visible{outline:2px solid var(--flag);outline-offset:2px}
 .dim{opacity:.2}
@@ -157,6 +157,19 @@ code{font-family:var(--font-m);font-size:.92em;background:var(--surface-2);
 .mkring{fill:none;stroke:var(--flag);stroke-width:1.9}
 .mkbody{stroke:var(--surface);stroke-width:1.5}
 .hit{fill:transparent;cursor:pointer}
+.riv{fill:none;stroke:#4a7fa8;stroke-width:1.4;stroke-opacity:.85;stroke-linecap:round}
+.str{fill:none;stroke:#4a7fa8;stroke-width:.6;stroke-opacity:.42;stroke-linecap:round}
+.rd{fill:none;stroke:#7d6a52;stroke-width:.9;stroke-opacity:.62;stroke-linecap:round}
+.plc{fill:var(--ink);font-family:var(--font-b);font-size:9.5px;font-weight:500;
+  paint-order:stroke;stroke:var(--surface);stroke-width:2.6px;stroke-linejoin:round}
+.plc-dot{fill:var(--ink);fill-opacity:.55}
+:root[data-theme="dark"] .riv,:root:not([data-theme="light"]) .riv{stroke:#6fb4dd}
+:root[data-theme="dark"] .str,:root:not([data-theme="light"]) .str{stroke:#6fb4dd}
+:root[data-theme="dark"] .rd,:root:not([data-theme="light"]) .rd{stroke:#b39a76}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]) .riv,:root:not([data-theme="dark"]) .str{stroke:#4a7fa8}
+  :root:not([data-theme="dark"]) .rd{stroke:#7d6a52}
+}
 .mapgrid > .panel:first-child{align-self:start}
 .rcol{display:flex;flex-direction:column;gap:20px}
 .lg-grp{display:flex;flex-direction:column;gap:7px;margin-bottom:16px}

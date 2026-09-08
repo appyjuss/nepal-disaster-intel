@@ -5,6 +5,13 @@ var D = window.__NDIP__;
 var SVGNS = "http://www.w3.org/2000/svg";
 function el(n,a){var e=document.createElementNS(SVGNS,n);for(var k in a){if(a[k]!==null&&a[k]!==undefined)e.setAttribute(k,a[k]);}return e;}
 function txt(s){return document.createTextNode(s);}
+function path(pts,X,Y){var d="",i;for(i=0;i<pts.length;i++){d+=(i?"L":"M")+X(pts[i][0]).toFixed(1)+" "+Y(pts[i][1]).toFixed(1);}return d;}
+function drawLines(svg,lines,cls,X,Y){
+  if(!lines||!lines.length)return;
+  var g=el("g",{"class":cls,"pointer-events":"none"}),i;
+  for(i=0;i<lines.length;i++) g.appendChild(el("path",{d:path(lines[i],X,Y)}));
+  svg.appendChild(g);
+}
 
 var tip = document.getElementById("tip");
 function showTip(html,ev){tip.innerHTML=html;tip.classList.add("on");moveTip(ev);}
@@ -27,11 +34,25 @@ var COS=Math.cos((S_+N_)/2*Math.PI/180);
   var svg=document.getElementById("map");
   svg.setAttribute("viewBox","0 0 "+W+" "+H);
   svg.style.maxHeight="660px";
+  // Rivers and roads run past the area of interest; without this they spill across
+  // the page because the shared svg rule allows overflow for chart labels.
+  svg.style.overflow="hidden";
   var X=function(lo){return (lo-W_)/lonSpan*W;}, Y=function(la){return (N_-la)/latSpan*H;};
 
   svg.appendChild(el("image",{href:"data:image/png;base64,"+D.hillshade,x:0,y:0,width:W,height:H,
     preserveAspectRatio:"none","class":"hill"}));
   svg.appendChild(el("rect",{x:.5,y:.5,width:W-1,height:H-1,"class":"aoi"}));
+
+  drawLines(svg, D.streams, "str", X, Y);
+  drawLines(svg, D.roads,   "rd",  X, Y);
+  drawLines(svg, D.rivers,  "riv", X, Y);
+  (D.places||[]).forEach(function(pl){
+    var x=X(pl.lon), y=Y(pl.lat);
+    if(x<8||x>W-8||y<12||y>H-8) return;
+    svg.appendChild(el("circle",{cx:x,cy:y,r:1.8,"class":"plc-dot"}));
+    var t=el("text",{x:x+5,y:y+3.4,"class":"plc"}); t.appendChild(txt(pl.name));
+    svg.appendChild(t);
+  });
 
   var maxHa=Math.max.apply(null,D.polygons.map(function(p){return p.ha;}));
   var g=el("g",{});
@@ -58,6 +79,14 @@ var COS=Math.cos((S_+N_)/2*Math.PI/180);
   sb.appendChild(t);
   svg.appendChild(sb);
   window.__mapG=g;
+  var lg=document.querySelector(".legend");
+  if(lg){
+    lg.insertAdjacentHTML("beforeend",
+      '<span><i style="background:#4a7fa8;border-radius:0;height:2px;width:14px;'+
+      'vertical-align:3px"></i>rivers and streams</span>'+
+      '<span><i style="background:#7d6a52;border-radius:0;height:2px;width:14px;'+
+      'vertical-align:3px"></i>major roads</span>');
+  }
 })();
 
 /* ---------- inset: true-shape southern cluster ---------- */
@@ -81,6 +110,17 @@ var COS=Math.cos((S_+N_)/2*Math.PI/180);
     x:-(lo0-W_)*sx, y:-(N_-la1)*sy, width:lonSpan*sx, height:latSpan*sy,
     preserveAspectRatio:"none","class":"hill"}));
   svg.appendChild(el("rect",{x:.5,y:.5,width:W-1,height:H-1,"class":"aoi"}));
+
+  drawLines(svg, D.streams, "str", X, Y);
+  drawLines(svg, D.roads,   "rd",  X, Y);
+  drawLines(svg, D.rivers,  "riv", X, Y);
+  (D.places||[]).forEach(function(pl){
+    var x=X(pl.lon), y=Y(pl.lat);
+    if(x<4||x>W-4||y<10||y>H-4) return;
+    svg.appendChild(el("circle",{cx:x,cy:y,r:2,"class":"plc-dot"}));
+    var t=el("text",{x:x+5,y:y+3.6,"class":"plc"}); t.appendChild(txt(pl.name));
+    svg.appendChild(t);
+  });
 
   pts.forEach(function(p){
     p.rings.forEach(function(r){

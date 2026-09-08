@@ -104,8 +104,22 @@ def read_inputs(catalog: Catalog, event: DisasterEvent) -> ReportInputs:
     )
 
 
+# Low saturation on purpose: the terrain is a backdrop, and the only strong colour on
+# the page belongs to the measurements. The pale top of the ramp is the snow zone,
+# which is also where the one suspect detection sits.
+ELEVATION_RAMP = (
+    (0.00, (58, 64, 62)),
+    (0.30, (104, 104, 96)),
+    (0.62, (156, 154, 146)),
+    (1.00, (236, 238, 240)),
+)
+
+
 def hillshade_png_base64(elevation: np.ndarray, *, pixel_size_m: float = 90.0) -> str:
-    """A shaded relief image of the area, for the page to draw detections onto.
+    """Shaded relief tinted by height, for the page to draw detections onto.
+
+    Flat grey hides the thing that matters: which parts are valley and which are
+    mountain. Tinting by elevation makes the corridor legible at a glance.
 
     Embedded rather than fetched: a published page cannot reach a tile server, and
     a basemap that silently fails to load leaves the detections floating in space.
@@ -121,7 +135,19 @@ def hillshade_png_base64(elevation: np.ndarray, *, pixel_size_m: float = 90.0) -
     low, high = np.nanmin(shade), np.nanmax(shade)
     normalised = np.clip((shade - low) / (high - low), 0.0, 1.0)
 
-    image = Image.fromarray((normalised * 255).astype(np.uint8), mode="L").convert("RGB")
+    finite = elevation[np.isfinite(elevation)]
+    low_m, high_m = (float(finite.min()), float(finite.max())) if finite.size else (0.0, 1.0)
+    height = np.clip((elevation - low_m) / max(high_m - low_m, 1e-6), 0.0, 1.0)
+
+    stops = np.array([s[0] for s in ELEVATION_RAMP])
+    tint = np.stack(
+        [np.interp(height, stops, [s[1][channel] for s in ELEVATION_RAMP]) for channel in range(3)],
+        axis=-1,
+    )
+    # Relief is applied as light on the tint rather than replacing it, so both the
+    # height and the shape of the ground survive.
+    lit = tint * (0.55 + 0.75 * normalised)[..., None]
+    image = Image.fromarray(np.clip(lit, 0, 255).astype(np.uint8), mode="RGB")
     buffer = io.BytesIO()
     image.save(buffer, format="PNG", optimize=True)
     return base64.b64encode(buffer.getvalue()).decode()
@@ -139,6 +165,7 @@ def build_payload(
     resolution_m: float,
     buffer_m: float,
     overture_release: str,
+    context_layers: dict | None = None,
 ) -> dict:
     polygons = []
     for record in inputs.polygons:
@@ -172,6 +199,7 @@ def build_payload(
         )
 
     high = [p for p in polygons if p["conf"] == "high"]
+    medium = [p for p in polygons if p["conf"] == "medium"]
     dbs = [p["db"] for p in high]
     lowland = [p for p in high if p["elev"] is not None and p["elev"] <= LOWLAND_MAX_ELEVATION_M]
     highland = [p for p in high if p["elev"] is not None and p["elev"] > LOWLAND_MAX_ELEVATION_M]
@@ -223,15 +251,26 @@ def build_payload(
             "buffer_m": buffer_m,
         }
 
+    layers = context_layers or {}
     return {
         "polygons": polygons,
+        "rivers": layers.get("rivers", []),
+        "streams": layers.get("streams", []),
+        "roads": layers.get("roads", []),
+        "places": layers.get("places", []),
         "rain": inputs.rainfall,
         "radar": inputs.radar,
         "optical": inputs.optical,
         "aoi": event.aoi.as_list(),
         "hillshade": hillshade,
         "facts": facts,
-        "counts": {"total": facts["total"], "high": facts["high"]},
+        "counts": {
+            "total": facts["total"],
+            "high": len(high),
+            "medium": len(medium),
+            # Everything graded low stayed in silver but is not shown region by region.
+            "low": max(inputs.total_regions - len(high) - len(medium), 0),
+        },
     }
 
 
