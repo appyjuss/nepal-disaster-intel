@@ -8,7 +8,7 @@ one. It runs on free data and a laptop. The whole thing is one command, and the 
 writes to a local directory or to S3 depending on one environment variable.
 
 V1 is scope-frozen to one case study, the 26 August 2026 Trishuli Valley event over a
-0.6° × 0.8° corridor in Nuwakot/Rasuwa. See [`docs/contract-v1.md`](docs/contract-v1.md).
+0.6° × 0.8° corridor in Nuwakot/Rasuwa. See [`docs/roadmap.md`](docs/roadmap.md) for what comes next.
 
 ## Data flow
 
@@ -210,7 +210,7 @@ Compose for the S3 rehearsal.
 
 ---
 
-Measured figures on this page come from single runs recorded in `docs/contract-v1.md` on
+Measured figures on this page come from single runs recorded on
 2026-09-07, against an upstream catalogue that keeps moving; they are measurements, not test
 assertions. `CLAUDE.md` holds the working notes, including the failure modes that cost the most
 time.
