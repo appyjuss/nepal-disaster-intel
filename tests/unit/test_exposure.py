@@ -47,13 +47,16 @@ def test_a_region_with_nothing_mapped_around_it_reads_as_empty():
 
 
 def test_a_single_nearby_road_means_the_region_is_not_empty():
-    assert exp(
-        roads=FeatureCount(0, 1),
-        bridges=FeatureCount(0, 0),
-        buildings=FeatureCount(0, 0),
-        population_within=0.0,
-        population_in_buffer=0.0,
-    ).is_empty is False
+    assert (
+        exp(
+            roads=FeatureCount(0, 1),
+            bridges=FeatureCount(0, 0),
+            buildings=FeatureCount(0, 0),
+            population_within=0.0,
+            population_in_buffer=0.0,
+        ).is_empty
+        is False
+    )
 
 
 def test_bridges_are_flagged_because_one_bridge_decides_connectivity():

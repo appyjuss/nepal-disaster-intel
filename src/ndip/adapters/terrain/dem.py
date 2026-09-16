@@ -11,6 +11,8 @@ both imagery and terrain means no AWS credentials are needed to run the pipeline
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import numpy as np
 import planetary_computer
 import pystac_client
@@ -19,12 +21,69 @@ from odc.stac import load as odc_load
 
 from ndip.adapters.raster.gdal_env import configure_gdal
 from ndip.domain.geometry import BBox
+from ndip.domain.terrain import aspect_from_elevation, slope_from_elevation
 
 log = structlog.get_logger(__name__)
 
 PLANETARY_COMPUTER_STAC = "https://planetarycomputer.microsoft.com/api/stac/v1"
 COP_DEM_COLLECTION = "cop-dem-glo-30"
 DEM_BAND = "data"
+
+
+@dataclass(frozen=True, slots=True)
+class TerrainGrid:
+    """Elevation and its derivatives on one grid, with the transform needed to
+    measure them inside a polygon."""
+
+    elevation: np.ndarray
+    slope_deg: np.ndarray
+    aspect_deg: np.ndarray
+    transform: object
+    crs: str
+    resolution_m: float
+
+
+def load_terrain_grid(aoi: BBox, *, resolution_m: int) -> TerrainGrid:
+    """Elevation, slope and aspect for the area, on a metric grid."""
+    cube = _load_dem(aoi, resolution_m)
+    elevation = cube[DEM_BAND].squeeze().compute()
+    values = elevation.values
+    epsg = utm_epsg(aoi)
+    grid = TerrainGrid(
+        elevation=values,
+        slope_deg=slope_from_elevation(values, pixel_size_m=float(resolution_m)),
+        aspect_deg=aspect_from_elevation(values, pixel_size_m=float(resolution_m)),
+        transform=elevation.odc.geobox.transform,
+        crs=f"EPSG:{epsg}",
+        resolution_m=float(resolution_m),
+    )
+    log.info(
+        "dem.grid.loaded",
+        shape=list(values.shape),
+        median_slope_deg=round(float(np.nanmedian(grid.slope_deg)), 2),
+        elevation_range=[int(np.nanmin(values)), int(np.nanmax(values))],
+    )
+    return grid
+
+
+def _load_dem(aoi: BBox, resolution_m: int):
+    configure_gdal()
+    client = pystac_client.Client.open(PLANETARY_COMPUTER_STAC)
+    items = [
+        planetary_computer.sign(item)
+        for item in client.search(collections=[COP_DEM_COLLECTION], bbox=aoi.as_list()).items()
+    ]
+    if not items:
+        raise LookupError(f"no Copernicus DEM tiles cover {aoi.as_list()}")
+    return odc_load(
+        items,
+        bands=[DEM_BAND],
+        crs=f"EPSG:{utm_epsg(aoi)}",
+        resolution=resolution_m,
+        bbox=aoi.as_list(),
+        chunks={},
+        dtype="float32",
+    )
 
 
 def load_slope_degrees(
@@ -35,25 +94,7 @@ def load_slope_degrees(
     The DEM predates the event, so it describes the terrain that conditioned the
     failure rather than the terrain left behind by it.
     """
-    configure_gdal()
-    client = pystac_client.Client.open(PLANETARY_COMPUTER_STAC)
-    items = [
-        planetary_computer.sign(item)
-        for item in client.search(collections=[COP_DEM_COLLECTION], bbox=aoi.as_list()).items()
-    ]
-    if not items:
-        raise LookupError(f"no Copernicus DEM tiles cover {aoi.as_list()}")
-
-    cube = odc_load(
-        items,
-        bands=[DEM_BAND],
-        crs=f"EPSG:{utm_epsg(aoi)}",
-        resolution=resolution_m,
-        bbox=aoi.as_list(),
-        chunks={},
-        dtype="float32",
-    )
-    elevation = cube[DEM_BAND].squeeze().compute().values
+    elevation = _load_dem(aoi, resolution_m)[DEM_BAND].squeeze().compute().values
     slope = slope_from_elevation(elevation, pixel_size_m=float(resolution_m))
 
     if shape is not None and slope.shape != shape:
@@ -61,19 +102,10 @@ def load_slope_degrees(
 
     log.info(
         "dem.slope.loaded",
-        tiles=len(items),
         shape=list(slope.shape),
         median_slope_deg=round(float(np.nanmedian(slope)), 2),
     )
     return slope
-
-
-def slope_from_elevation(elevation: np.ndarray, *, pixel_size_m: float) -> np.ndarray:
-    """Steepest gradient at each cell, in degrees."""
-    if pixel_size_m <= 0:
-        raise ValueError("pixel size must be positive")
-    dz_dy, dz_dx = np.gradient(elevation.astype(np.float64), pixel_size_m)
-    return np.degrees(np.arctan(np.hypot(dz_dx, dz_dy))).astype(np.float32)
 
 
 def _fit_to(array: np.ndarray, shape: tuple[int, int]) -> np.ndarray:

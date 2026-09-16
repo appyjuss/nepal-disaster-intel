@@ -83,6 +83,27 @@ Building density inside the buffers runs ~420/km² against an area-wide 226/km²
 which is the expected direction: detections sit on the inhabited valley floor while
 the wider area includes empty high mountains.
 
+## Event context results (2026-09-07)
+
+Terrain and rainfall for all 16 corroborated regions. The two gold tables together
+change the reading of the headline result:
+
+- **15 regions** sit at 386–616 m on 1.6–14.9 degree slopes, 0–37 m from a mapped
+  channel, each with hundreds of buildings and 493–3299 people in its buffer. Valley
+  floor, on the drainage network, inhabited.
+- **1 region** sits at 6822 m on a 45.5 degree face, 2517 m from any channel, with
+  zero buildings, roads, bridges or people near it.
+
+**Neither group is confidently a landslide.** The valley-floor detections carry the
+river-variation caveat already recorded above. The high-altitude one is best explained
+as wet snow, which absorbs radar and darkens by several decibels — a known false
+positive at that elevation, not a slope failure, despite being corroborated by both
+look directions and classified `slope_failure_like` on slope alone.
+
+The honest V1 conclusion is that the pipeline reliably finds *surface change* and
+grades it well, and that separating flood, river variation and snow from slope failure
+needs evidence this pipeline does not yet carry. That is a V4 question, not a V1 one.
+
 ## Version ladder (not V1 scope, recorded so V1 does not paint us into a corner)
 
 V2 lakehouse + Spark, Nepal-wide · V3 historical disaster corpus · V4 ML susceptibility/impact

@@ -20,6 +20,7 @@ uv run ndip ingest                         # discover, then land results in bron
 uv run ndip detect                         # change detection -> silver.change_polygons
 uv run ndip detect --bbox "w,s,e,n" --no-write   # try a small area without persisting
 uv run ndip expose                         # exposure for corroborated changes -> gold.exposure
+uv run ndip context                        # terrain + rainfall conditions -> gold.event_context
 ```
 
 The warehouse defaults to `data/warehouse` on the local filesystem with a SQLite
@@ -75,12 +76,21 @@ tells you within milliseconds whether the daemon or the CLI is at fault.
   Set empty `s3_access_key_id`/`s3_secret_access_key` in DuckDB for unsigned reads.
 - **Buffer in metres, never in degrees.** At 28N a degree of longitude is ~12% shorter
   than a degree of latitude, so a degree buffer is an ellipse. `buffer_metres` projects.
+- **Silver stores geometry in WGS84; the terrain grid is projected.** Convert before any
+  zonal read. Rasterising a lon/lat polygon against a metre grid selects nothing and
+  reported every region at 0 m on flat ground. `build_context` now raises instead.
+- **Aspect is a bearing, so average it as a vector.** The arithmetic mean of 350 and 10
+  is 180, pointing opposite to both. Flat cells carry no aspect at all, not north.
+- **A high-altitude radar darkening is probably wet snow, not a landslide.** Snow absorbs
+  radar and darkens sharply. Check elevation before believing a steep-slope detection.
 - **Give any silver/gold row an id derived from its content**, never a running index.
   Index ids collide across runs and the upsert quietly overwrites unrelated rows.
 - **Sentinel-1 arrives as several frames per acquisition**, sliced along the orbit
-  (you will see 00:18 and 00:19 on the same track). They are not duplicates. Pair
-  selection currently picks one frame arbitrarily; change detection will need to
-  mosaic the frames covering the AOI before differencing.
+  (you will see 00:18 and 00:19 on the same track). They are not duplicates, and one
+  of the two can miss the area entirely — a frame that looks perfectly valid and
+  contains nothing. `RtcLoader` keeps only frames covering at least 1% of the area and
+  mosaics them per acquisition day; `discover` still names a single representative
+  frame per pair, which is fine for reporting and is not what detection reads.
 
 ## Layering
 

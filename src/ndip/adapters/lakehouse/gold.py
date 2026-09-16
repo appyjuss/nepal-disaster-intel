@@ -10,11 +10,16 @@ from pyiceberg.catalog import Catalog
 
 from ndip.adapters.lakehouse.catalog import ensure_table
 from ndip.adapters.lakehouse.schemas import (
+    EVENT_CONTEXT,
+    EVENT_CONTEXT_KEY,
+    EVENT_CONTEXT_PARTITION,
+    EVENT_CONTEXT_SCHEMA,
     EXPOSURE,
     EXPOSURE_KEY,
     EXPOSURE_PARTITION,
     EXPOSURE_SCHEMA,
 )
+from ndip.application.context import ContextResult
 from ndip.application.expose import ExposureResult
 
 log = structlog.get_logger(__name__)
@@ -64,6 +69,65 @@ class GoldWriter:
         outcome = table.upsert(df, join_cols=EXPOSURE_KEY)
         log.info(
             "gold.exposure.written",
+            event_id=result.event_id,
+            rows=len(rows),
+            inserted=outcome.rows_inserted,
+            updated=outcome.rows_updated,
+        )
+        return len(rows)
+
+    def write_event_context(
+        self,
+        result: ContextResult,
+        *,
+        event_date,
+        rainfall_source: str,
+        rainfall_grid_km: float,
+        terrain_source: str,
+        drainage_source: str,
+    ) -> int:
+        if not result.contexts:
+            log.info("gold.event_context.skipped", reason="no contexts")
+            return 0
+
+        table = ensure_table(
+            self._catalog, EVENT_CONTEXT, EVENT_CONTEXT_SCHEMA, EVENT_CONTEXT_PARTITION
+        )
+        now = datetime.now(UTC)
+        rows = []
+        for c in result.contexts:
+            r = c.rainfall
+            aspect = c.terrain.aspect_deg
+            rows.append(
+                {
+                    "event_id": result.event_id,
+                    "polygon_id": c.polygon_id,
+                    "event_date": event_date,
+                    "elevation_m": c.terrain.elevation_m,
+                    "slope_deg": c.terrain.slope_deg,
+                    # Flat ground has no aspect; storing a number there would invent
+                    # a direction the terrain does not have.
+                    "aspect_deg": None if aspect != aspect else aspect,
+                    "aspect_cardinal": c.terrain.aspect_cardinal,
+                    "distance_to_drainage_m": c.terrain.distance_to_drainage_m,
+                    "precipitation_event_day_mm": r.on_event_day_mm,
+                    "precipitation_7d_mm": r.window_totals_mm.get(7, 0.0),
+                    "precipitation_14d_mm": r.window_totals_mm.get(14, 0.0),
+                    "precipitation_30d_mm": r.window_totals_mm.get(30, 0.0),
+                    "antecedent_index_mm": r.antecedent_index_mm,
+                    "rainfall_pattern": c.rainfall_pattern,
+                    "rainfall_source": rainfall_source,
+                    "rainfall_grid_km": rainfall_grid_km,
+                    "terrain_source": terrain_source,
+                    "drainage_source": drainage_source,
+                    "built_at": now,
+                }
+            )
+
+        df = pa.Table.from_pylist(rows, schema=EVENT_CONTEXT_SCHEMA.as_arrow())
+        outcome = table.upsert(df, join_cols=EVENT_CONTEXT_KEY)
+        log.info(
+            "gold.event_context.written",
             event_id=result.event_id,
             rows=len(rows),
             inserted=outcome.rows_inserted,

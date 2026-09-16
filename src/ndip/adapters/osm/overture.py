@@ -23,12 +23,18 @@ DEFAULT_RELEASE = "2026-08-19.0"
 
 ROADS_FILE = "roads.parquet"
 BUILDINGS_FILE = "buildings.parquet"
+WATER_FILE = "water.parquet"
+
+# Flowing water only. Distance to drainage is about the channel network that
+# concentrates runoff and undercuts slopes; a pond or a swimming pool does neither.
+DRAINAGE_SUBTYPES = ("river", "stream", "canal")
 
 
 @dataclass(frozen=True, slots=True)
 class OvertureExtract:
     roads: Path
     buildings: Path
+    water: Path
     release: str
 
 
@@ -51,9 +57,10 @@ def ensure_extract(
     out = cache_dir / release
     out.mkdir(parents=True, exist_ok=True)
     roads, buildings = out / ROADS_FILE, out / BUILDINGS_FILE
-    if roads.exists() and buildings.exists() and not refresh:
+    water = out / WATER_FILE
+    if roads.exists() and buildings.exists() and water.exists() and not refresh:
         log.info("overture.extract.cached", release=release, dir=str(out))
-        return OvertureExtract(roads=roads, buildings=buildings, release=release)
+        return OvertureExtract(roads=roads, buildings=buildings, water=water, release=release)
 
     where = (
         f"bbox.xmin < {aoi.east} AND bbox.xmax > {aoi.west} "
@@ -84,10 +91,22 @@ def ensure_extract(
               WHERE {where}
             ) TO '{buildings}' (FORMAT PARQUET)"""
         )
+        subtypes = ", ".join(f"'{t}'" for t in DRAINAGE_SUBTYPES)
+        con.execute(
+            f"""COPY (
+              SELECT id, subtype, class, names.primary AS name,
+                     ST_AsWKB(geometry) AS geom_wkb
+              FROM read_parquet(
+                '{OVERTURE_BUCKET}/release/{release}/theme=base/type=water/*.parquet'
+              )
+              WHERE {where} AND subtype IN ({subtypes})
+            ) TO '{water}' (FORMAT PARQUET)"""
+        )
         counts = con.execute(
             f"""SELECT (SELECT count(*) FROM '{roads}'),
                        (SELECT count(*) FROM '{roads}' WHERE is_bridge),
-                       (SELECT count(*) FROM '{buildings}')"""
+                       (SELECT count(*) FROM '{buildings}'),
+                       (SELECT count(*) FROM '{water}')"""
         ).fetchone()
     finally:
         con.close()
@@ -98,8 +117,9 @@ def ensure_extract(
         roads=counts[0],
         bridges=counts[1],
         buildings=counts[2],
+        drainage=counts[3],
     )
-    return OvertureExtract(roads=roads, buildings=buildings, release=release)
+    return OvertureExtract(roads=roads, buildings=buildings, water=water, release=release)
 
 
 def count_features(
@@ -177,3 +197,18 @@ def count_features(
 
     log.info("overture.counts.complete", regions=len(regions))
     return result
+
+
+def load_drainage(extract: OvertureExtract) -> list[bytes]:
+    """Every drainage geometry in the study area, as WKB.
+
+    The network is small enough after the area filter that measuring distances in
+    process is simpler than pushing a projected distance join into the database.
+    """
+    con = _connect()
+    try:
+        rows = con.execute(f"SELECT geom_wkb FROM '{extract.water}'").fetchall()
+    finally:
+        con.close()
+    log.info("overture.drainage.loaded", features=len(rows))
+    return [r[0] for r in rows]
