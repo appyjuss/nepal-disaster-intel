@@ -7,13 +7,14 @@ first fell back to the server's default page size (10) instead of 100.
 
 from __future__ import annotations
 
+from datetime import date
+
 import httpx
 import pytest
 import respx
 
 from ndip.adapters.stac.client import PAGE_SIZE, StacSearch
 from ndip.domain.geometry import BBox
-from datetime import date
 
 AOI = BBox(84.85, 27.55, 85.45, 28.35)
 ENDPOINT = "https://stac.test/v1"
@@ -43,8 +44,13 @@ def test_page_size_is_preserved_across_next_links():
                 200,
                 json={
                     "features": [_feature(page)],
-                    "links": [{"rel": "next", "method": "GET",
-                               "href": f"{ENDPOINT}/search?page={page + 1}"}],
+                    "links": [
+                        {
+                            "rel": "next",
+                            "method": "GET",
+                            "href": f"{ENDPOINT}/search?page={page + 1}",
+                        }
+                    ],
                 },
             )
         return httpx.Response(200, json={"features": [_feature(page)], "links": []})
@@ -63,9 +69,13 @@ def test_page_size_is_preserved_across_next_links():
 @respx.mock
 def test_duplicate_items_across_pages_are_not_double_counted():
     responses = [
-        httpx.Response(200, json={"features": [_feature(1), _feature(2)],
-                                  "links": [{"rel": "next", "method": "GET",
-                                             "href": f"{ENDPOINT}/search?page=2"}]}),
+        httpx.Response(
+            200,
+            json={
+                "features": [_feature(1), _feature(2)],
+                "links": [{"rel": "next", "method": "GET", "href": f"{ENDPOINT}/search?page=2"}],
+            },
+        ),
         httpx.Response(200, json={"features": [_feature(2), _feature(3)], "links": []}),
     ]
     respx.get(url__startswith=f"{ENDPOINT}/search").mock(side_effect=responses)
@@ -81,11 +91,15 @@ def test_duplicate_items_across_pages_are_not_double_counted():
 @respx.mock
 def test_a_server_that_never_stops_paging_is_bounded_not_infinite():
     respx.get(url__startswith=f"{ENDPOINT}/search").mock(
-        return_value=httpx.Response(200, json={
-            "features": [_feature(1)],
-            "links": [{"rel": "next", "method": "GET", "href": f"{ENDPOINT}/search?page=9"}],
-        })
+        return_value=httpx.Response(
+            200,
+            json={
+                "features": [_feature(1)],
+                "links": [{"rel": "next", "method": "GET", "href": f"{ENDPOINT}/search?page=9"}],
+            },
+        )
     )
     with StacSearch(ENDPOINT) as search, pytest.raises(RuntimeError, match="page ceiling"):
-        search.search(collection="sentinel-1-grd", bbox=AOI,
-                      start=date(2026, 8, 5), end=date(2026, 9, 16))
+        search.search(
+            collection="sentinel-1-grd", bbox=AOI, start=date(2026, 8, 5), end=date(2026, 9, 16)
+        )

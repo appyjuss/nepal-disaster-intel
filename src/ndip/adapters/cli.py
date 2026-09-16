@@ -9,10 +9,14 @@ from dataclasses import replace
 
 import structlog
 
+from ndip.adapters.config import load_settings
+from ndip.adapters.lakehouse.bronze import BronzeWriter
+from ndip.adapters.lakehouse.catalog import build_catalog
 from ndip.adapters.stac.client import EARTH_SEARCH, StacSearch
 from ndip.adapters.weather.open_meteo import fetch_daily_rainfall
 from ndip.application.discover import discover
 from ndip.application.events import REGISTRY, TRISHULI_2026_08_26
+from ndip.application.ingest import ingest_bronze
 from ndip.domain.geometry import BBox
 
 
@@ -39,6 +43,12 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("--endpoint", default=EARTH_SEARCH)
     d.add_argument("-v", "--verbose", action="store_true")
 
+    i = sub.add_parser("ingest", help="discover, then land the results in bronze")
+    i.add_argument("--event", default=TRISHULI_2026_08_26.event_id, choices=sorted(REGISTRY))
+    i.add_argument("--bbox", help="override AOI as 'w,s,e,n' in EPSG:4326")
+    i.add_argument("--endpoint", default=EARTH_SEARCH)
+    i.add_argument("-v", "--verbose", action="store_true")
+
     args = parser.parse_args(argv)
     _configure_logging(args.verbose)
 
@@ -59,6 +69,14 @@ def main(argv: list[str] | None = None) -> int:
     print()
     for line in result.summary_lines():
         print(line)
+
+    if args.command == "ingest":
+        writer = BronzeWriter(build_catalog(load_settings()))
+        report = ingest_bronze(result, writer=writer, source_endpoint=args.endpoint)
+        print()
+        for line in report.summary_lines():
+            print(line)
+
     print()
     return 0
 

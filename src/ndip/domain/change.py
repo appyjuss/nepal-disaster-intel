@@ -67,9 +67,7 @@ class ChangePolygon:
             return ChangeClass.VALLEY_FLOOR_LIKE
         return ChangeClass.SLOPE_FAILURE_LIKE
 
-    def confidence(
-        self, min_mapping_unit_m2: float = DEFAULT_MIN_MAPPING_UNIT_M2
-    ) -> Confidence:
+    def confidence(self, min_mapping_unit_m2: float = DEFAULT_MIN_MAPPING_UNIT_M2) -> Confidence:
         if self.area_m2 < min_mapping_unit_m2:
             return Confidence.REJECTED
         if self.geometry_agreement:
@@ -90,9 +88,5 @@ def reportable(
     Rejected polygons are dropped here but are still written to the silver layer —
     the pipeline keeps its own false positives so the threshold stays auditable.
     """
-    kept = [
-        p
-        for p in polygons
-        if p.confidence(min_mapping_unit_m2) is not Confidence.REJECTED
-    ]
+    kept = [p for p in polygons if p.confidence(min_mapping_unit_m2) is not Confidence.REJECTED]
     return sorted(kept, key=lambda p: p.area_m2, reverse=True)

@@ -38,6 +38,8 @@ class DiscoveryResult:
     optical_candidates: list[StacItem]
     rainfall: RainfallContext
     radar_items: list[StacItem]
+    # Bronze stores what the source said, so the summary is not enough on its own.
+    rainfall_series: list[DailyRainfall]
 
     @property
     def has_dual_geometry(self) -> bool:
@@ -99,9 +101,7 @@ def discover(
     """Find the usable radar pairs, optical corroboration, and rainfall context."""
     radar_start, radar_end = event.search_window(SEARCH_DAYS_BEFORE, SEARCH_DAYS_AFTER)
 
-    radar_items = search.search(
-        collection=S1_GRD, bbox=event.aoi, start=radar_start, end=radar_end
-    )
+    radar_items = search.search(collection=S1_GRD, bbox=event.aoi, start=radar_start, end=radar_end)
     pairs = best_pair_per_track([i.scene for i in radar_items], event)
     if not pairs:
         raise LookupError(
@@ -114,9 +114,8 @@ def discover(
     )
 
     weather_start, weather_end = event.search_window(WEATHER_DAYS_BEFORE, WEATHER_DAYS_AFTER)
-    rainfall = summarise(
-        fetch_rainfall(event.aoi, weather_start, weather_end), event.occurred_on
-    )
+    rainfall_series = fetch_rainfall(event.aoi, weather_start, weather_end)
+    rainfall = summarise(rainfall_series, event.occurred_on)
 
     log.info(
         "discovery.complete",
@@ -131,4 +130,5 @@ def discover(
         optical_candidates=optical_items,
         rainfall=rainfall,
         radar_items=radar_items,
+        rainfall_series=rainfall_series,
     )

@@ -24,6 +24,8 @@ Sentinel-1 · Sentinel-2 · COP-DEM · ERA5 · Overture/OSM · WorldPop
 | Stage | State |
 |---|---|
 | V1 discovery — scene pairing, rainfall context | **working** |
+| V1 bronze ingest — Iceberg tables, idempotent | **working** |
+| S3-backed warehouse via MinIO (same code path) | **working** |
 | V1 change detection, exposure, gold tables | next |
 | V2 lakehouse at Nepal scale (Spark) | planned |
 | V3 historical disaster corpus | planned |
@@ -35,7 +37,8 @@ Sentinel-1 · Sentinel-2 · COP-DEM · ERA5 · Overture/OSM · WorldPop
 ```bash
 mise run install
 mise run test
-uv run ndip discover
+uv run ndip discover   # what data exists for the event
+uv run ndip ingest     # land it in the bronze layer
 ```
 
 See `CLAUDE.md` for commands and `docs/contract-v1.md` for what V1 does and does not do.

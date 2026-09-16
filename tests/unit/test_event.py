@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -14,7 +14,7 @@ def s(day: int, track: int, state: OrbitState) -> Scene:
     return Scene(
         item_id=f"S1_{day}_{track}",
         collection="sentinel-1-grd",
-        acquired_at=datetime(2026, 8, day, 0, 18, tzinfo=timezone.utc),
+        acquired_at=datetime(2026, 8, day, 0, 18, tzinfo=UTC),
         orbit_state=state,
         relative_orbit=track,
     )
@@ -23,12 +23,16 @@ def s(day: int, track: int, state: OrbitState) -> Scene:
 def test_pair_across_different_tracks_is_rejected():
     """Pairing across relative orbits compares viewing geometries, not ground."""
     with pytest.raises(ValueError, match="one relative orbit"):
-        ScenePair(pre=s(24, 19, OrbitState.DESCENDING), post=s(28, 85, OrbitState.DESCENDING), event=EVENT)
+        ScenePair(
+            pre=s(24, 19, OrbitState.DESCENDING), post=s(28, 85, OrbitState.DESCENDING), event=EVENT
+        )
 
 
 def test_pair_across_orbit_states_is_rejected():
     with pytest.raises(ValueError, match="one orbit state"):
-        ScenePair(pre=s(24, 19, OrbitState.DESCENDING), post=s(28, 19, OrbitState.ASCENDING), event=EVENT)
+        ScenePair(
+            pre=s(24, 19, OrbitState.DESCENDING), post=s(28, 19, OrbitState.ASCENDING), event=EVENT
+        )
 
 
 def test_real_trishuli_acquisitions_yield_two_tracks_with_opposing_geometry():
@@ -41,7 +45,7 @@ def test_real_trishuli_acquisitions_yield_two_tracks_with_opposing_geometry():
     scenes[3] = Scene(
         item_id="S1_sep5_19",
         collection="sentinel-1-grd",
-        acquired_at=datetime(2026, 9, 5, 0, 18, tzinfo=timezone.utc),
+        acquired_at=datetime(2026, 9, 5, 0, 18, tzinfo=UTC),
         orbit_state=OrbitState.DESCENDING,
         relative_orbit=19,
     )
@@ -57,11 +61,17 @@ def test_real_trishuli_acquisitions_yield_two_tracks_with_opposing_geometry():
 
 
 def test_track_without_a_post_event_scene_is_dropped_not_faked():
-    pairs = best_pair_per_track([s(16, 85, OrbitState.ASCENDING), s(24, 85, OrbitState.ASCENDING)], EVENT)
+    pairs = best_pair_per_track(
+        [s(16, 85, OrbitState.ASCENDING), s(24, 85, OrbitState.ASCENDING)], EVENT
+    )
     assert pairs == {}
 
 
 def test_tightness_prefers_the_pair_closest_to_the_event():
-    tight = ScenePair(pre=s(24, 19, OrbitState.DESCENDING), post=s(28, 19, OrbitState.DESCENDING), event=EVENT)
-    loose = ScenePair(pre=s(12, 19, OrbitState.DESCENDING), post=s(31, 19, OrbitState.DESCENDING), event=EVENT)
+    tight = ScenePair(
+        pre=s(24, 19, OrbitState.DESCENDING), post=s(28, 19, OrbitState.DESCENDING), event=EVENT
+    )
+    loose = ScenePair(
+        pre=s(12, 19, OrbitState.DESCENDING), post=s(31, 19, OrbitState.DESCENDING), event=EVENT
+    )
     assert tight.tightness() < loose.tightness()

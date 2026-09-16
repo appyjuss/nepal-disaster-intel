@@ -16,10 +16,31 @@ mise run tf-test      # opentofu validate + test with mocked providers (no cloud
 
 uv run ndip discover                       # live discovery for the Trishuli event
 uv run ndip discover --bbox "w,s,e,n" -v   # override AOI
+uv run ndip ingest                         # discover, then land results in bronze
 ```
+
+The warehouse defaults to `data/warehouse` on the local filesystem with a SQLite
+catalog. To run against object storage instead:
+
+```bash
+mise run minio-up                      # MinIO on :9000, console on :9001
+cp .env.local.example .env.local
+set -a; source .env.local; set +a
+uv run ndip ingest                     # same command, now writing to s3://
+```
+
+Verified: the identical ingest produced 103 rows on both backends, with Hive-style
+partition paths under `bronze/stac_items/data/event_id=.../collection=.../`. The
+only difference between local and cloud is the warehouse URI and the credentials.
 
 Docker Desktop on Windows with WSL integration enabled for this Ubuntu distro. If `docker`
 vanishes from PATH, the toggle is Docker Desktop → Settings → Resources → WSL Integration.
+
+If a docker command hangs, check for an earlier one still running (`pgrep -af 'docker compose'`)
+before blaming the network. The CLI serialises behind a stuck call, and every later command
+then hangs and reports nonsense — `docker info` claimed zero images while three were present.
+`curl --unix-socket /var/run/docker.sock http://localhost/_ping` asks the daemon directly and
+tells you within milliseconds whether the daemon or the CLI is at fault.
 
 ## Gotchas that have already bitten
 
@@ -34,8 +55,17 @@ vanishes from PATH, the toggle is Docker Desktop → Settings → Resources → 
   looks perfectly healthy and is wrong.
 - **Optical is not the primary sensor here.** Monsoon cloud makes Sentinel-2 useless in the
   event window. See ADR 0001 before "just adding NDVI".
+- **Publish local service ports on loopback, not every interface.** `"9000:9000"` in
+  compose listens on `0.0.0.0`; write `"127.0.0.1:9000:9000"`. Nothing outside this
+  machine needs the local warehouse, and the local credentials are throwaway.
 - **ERA5 is a ~25 km grid.** Every rainfall figure leaving this system carries the
   "context, not measurement" caveat. Do not present it as observed rainfall.
+- **Bronze writes upsert, they do not append.** Ingests get retried; a rerun must
+  correct rows in place. If you add a bronze table, give it a natural key.
+- **Sentinel-1 arrives as several frames per acquisition**, sliced along the orbit
+  (you will see 00:18 and 00:19 on the same track). They are not duplicates. Pair
+  selection currently picks one frame arbitrarily; change detection will need to
+  mosaic the frames covering the AOI before differencing.
 
 ## Layering
 
