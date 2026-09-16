@@ -17,6 +17,8 @@ mise run tf-test      # opentofu validate + test with mocked providers (no cloud
 uv run ndip discover                       # live discovery for the Trishuli event
 uv run ndip discover --bbox "w,s,e,n" -v   # override AOI
 uv run ndip ingest                         # discover, then land results in bronze
+uv run ndip detect                         # change detection -> silver.change_polygons
+uv run ndip detect --bbox "w,s,e,n" --no-write   # try a small area without persisting
 ```
 
 The warehouse defaults to `data/warehouse` on the local filesystem with a SQLite
@@ -62,6 +64,12 @@ tells you within milliseconds whether the daemon or the CLI is at fault.
   "context, not measurement" caveat. Do not present it as observed rainfall.
 - **Bronze writes upsert, they do not append.** Ingests get retried; a rerun must
   correct rows in place. If you add a bronze table, give it a natural key.
+- **Read cloud rasters through the Planetary Computer, not the AWS mirrors.** The
+  AWS copies are addressed as `s3://`; GDAL then attempts a signed request and, with
+  no credentials, hangs instead of failing. Ten minutes of no traffic and no error.
+  `configure_gdal()` sets connect and read timeouts — call it before any raster read.
+- **Give any silver/gold row an id derived from its content**, never a running index.
+  Index ids collide across runs and the upsert quietly overwrites unrelated rows.
 - **Sentinel-1 arrives as several frames per acquisition**, sliced along the orbit
   (you will see 00:18 and 00:19 on the same track). They are not duplicates. Pair
   selection currently picks one frame arbitrarily; change detection will need to
