@@ -197,10 +197,6 @@ Also available: `mise run test-all` (adds the network-hitting integration test),
 | ML susceptibility / impact | planned (V4) |
 | GenAI analyst layer | planned (V5) |
 
-**Not built, and not claimed:** no cloud deployment, no Terraform or other infrastructure-as-code
-(`infra/` is an empty directory skeleton), no Kubernetes, no metrics export, no scheduler, no web
-UI. V1 runs locally by design; cloud is a deployment target, not a dependency.
-
 ## Stack
 
 Python 3.12 · Apache Iceberg via pyiceberg, SQLite catalog locally · Dagster · DuckDB with the
