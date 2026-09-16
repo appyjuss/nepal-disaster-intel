@@ -1,0 +1,169 @@
+<header>
+  <div class="hdr">
+    <div class="hdr-l">
+      <p class="eyebrow">Nepal Disaster Intelligence &middot; V1 reconstruction</p>
+      <h1>Trishuli Valley,<br>26 August 2026</h1>
+      <div class="coords">
+        <span>AOI 84.85, 27.55 &rarr; 85.45, 28.35</span>
+        <span>EPSG:32645</span>
+        <span>Sentinel-1 RTC &gamma;&#8304; VV</span>
+        <span>30 m</span>
+      </div>
+    </div>
+    <div class="headline-stats">
+      <div class="hs"><b id="f-high">—</b><small>corroborated</small></div>
+      <div class="hs"><b id="f-tracks">—</b><small>radar tracks</small></div>
+      <div class="hs"><b id="f-total">—</b><small>regions found</small></div>
+      <div class="hs"><b>0</b><small>cost</small></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<section>
+  <div class="finding">
+    <p class="lede" id="finding-lede"></p>
+    <p id="finding-body"></p>
+  </div>
+</section>
+
+<section>
+  <div class="shead">
+    <h2>Where the ground changed</h2>
+    <span class="note">markers scaled by area, exaggerated for legibility</span>
+  </div>
+  <div class="mapgrid">
+    <div class="panel">
+      <div class="panel-h"><span class="t">Area of interest</span>
+        <span class="s">59 &times; 89 km &middot; Copernicus DEM hillshade</span></div>
+      <div class="panel-b">
+        <svg id="map" role="img" aria-label="Terrain map of the Trishuli corridor with 28 graded radar change detections"></svg>
+        <div class="legend">
+          <span><i style="background:var(--dark)"></i>darkening &minus;dB (smoother)</span>
+          <span><i style="background:var(--bright)"></i>brightening +dB (rougher)</span>
+          <span><i class="ring"></i>seen from both look directions</span>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><span class="t">Southern cluster, true shape</span>
+        <span class="s">detections at actual extent</span></div>
+      <div class="panel-b">
+        <svg id="inset" role="img" aria-label="Zoomed view of the southern detection cluster at true polygon extent"></svg>
+        <p class="prose" id="inset-note" style="font-size:13px;margin-top:12px"></p>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:20px">
+      <div class="panel-h"><span class="t">Detection ledger</span>
+        <span class="s">732 regions</span></div>
+      <div class="panel-b"><div id="ledger"></div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="shead"><h2>What stood nearby</h2>
+    <span class="note" id="exp-note">&mdash;</span></div>
+  <div class="cols" id="exposure-tiles"></div>
+  <p class="prose" id="exposure-note" style="margin-top:14px;font-size:13.5px"></p>
+</section>
+
+<section>
+  <div class="shead"><h2>The fortnight before</h2>
+    <span class="note">ERA5 reanalysis &middot; ~25 km grid &middot; context, not measurement</span></div>
+  <div class="panel"><div class="panel-b">
+    <svg id="rain" role="img" aria-label="Daily rainfall from 27 July to 5 September 2026, with the event date marked"></svg>
+  </div></div>
+  <p class="prose" style="margin-top:12px;font-size:13.5px">ERA5 sits on a grid far coarser than the
+    valleys it is describing, and systematically under-reads orographic rain in the Himalaya. These
+    figures establish a pattern; they are not an observation of what fell on Trishuli.</p>
+</section>
+
+<section>
+  <div class="shead"><h2>Why radar, not optical</h2>
+    <span class="note">every Sentinel-2 pass in the window</span></div>
+  <div class="panel"><div class="panel-b">
+    <svg id="cloud" role="img" aria-label="Cloud cover of each Sentinel-2 scene over the window, nearly all above the usable threshold"></svg>
+  </div></div>
+  <p class="prose" style="margin-top:12px;font-size:13.5px">The instinctive design for this problem is
+    an optical vegetation-index difference. In monsoon it fails silently: the pipeline runs, produces
+    polygons, and the polygons are cloud edges. The last genuinely clear look at this ground was
+    <span class="mono">12 August</span>, fourteen days before the event.</p>
+</section>
+
+<section>
+  <div class="shead"><h2>Graded detections</h2>
+    <span class="note" id="table-note">hover a row to locate it</span></div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr>
+        <th>Detection</th><th>Hectares</th><th>Elev m</th><th>Slope&deg;</th><th>&Delta; dB</th>
+        <th>Drainage m</th><th>Buildings</th><th>Bridges</th><th>People</th>
+        <th>Seen by</th><th>Grade</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="shead"><h2>How a detection earns its grade</h2></div>
+  <div class="cols">
+    <div class="card">
+      <span class="k">The problem</span>
+      <h3>Mountains fake change</h3>
+      <p>Radar looks sideways, so steep terrain throws shadow and layover that read as change but are
+        pure geometry. In a valley this deep it is the dominant source of false positives.</p>
+    </div>
+    <div class="card">
+      <span class="k">The control</span>
+      <h3>Two look directions</h3>
+      <p>Layover and shadow move when the look direction moves. Real ground change does not. Only a
+        region seen from both an ascending and a descending pass is graded high &mdash; and two tracks
+        sharing a look direction cannot corroborate each other.</p>
+    </div>
+    <div class="card">
+      <span class="k">The bar</span>
+      <h3>Beyond mere detection</h3>
+      <p>A single look direction can still convince, but only at roughly double the threshold that got
+        the pixel detected. Setting that bar at the detection threshold made the grade automatic:
+        2142 of 2239 polygons scored medium and the grade meant nothing.</p>
+    </div>
+    <div class="card">
+      <span class="k">The floor</span>
+      <h3>One hectare</h3>
+      <p>Below about eleven 30-metre cells a region has no shape worth reporting. Smaller detections
+        stay in the silver layer, flagged, so the threshold itself remains auditable.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="shead"><h2>What this does not tell you</h2></div>
+  <ul class="plain">
+    <li><b>Twelve days separate the images, in peak monsoon.</b> Normal river-level change produces the
+      same valley-floor darkening as flooding does. On radar alone these detections are not separable
+      from seasonal variation &mdash; the single largest caveat on the headline result.</li>
+    <li><b>Change is not cause.</b> Backscatter change detects that a surface differs, not why.
+      Harvest, river migration, construction and flooding all register. Attribution stays human.</li>
+    <li><b>Not every track sees the whole area.</b> Coverage is reported per track and should be read
+      before trusting one; one of the three covers only a sixth of this area of interest.</li>
+    <li><b>A high detection is probably snow.</b> Radar darkens sharply over wet snow, so a
+      corroborated detection on a high steep face is more likely melt than a slope failure.</li>
+    <li><b>The terrain model predates the event.</b> Copernicus DEM describes the slope that
+      conditioned the failure, never the ground left behind by it.</li>
+    <li><b>No exposure analysis yet.</b> Roads, bridges, buildings and population are the next layer.
+      Nothing here says what was hit.</li>
+  </ul>
+</section>
+
+<footer>
+  <span id="f-footer">&mdash;</span>
+  <span>Apache Iceberg on local FS or S3</span>
+  <span>Sentinel-1 RTC + Copernicus DEM via Planetary Computer</span>
+  <span>Open-Meteo ERA5</span>
+  <span id="f-params">&mdash;</span>
+</footer>
+</div>
+<div class="tip" id="tip"></div>

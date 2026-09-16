@@ -16,10 +16,38 @@ mise run tf-test      # opentofu validate + test with mocked providers (no cloud
 
 uv run ndip discover                       # live discovery for the Trishuli event
 uv run ndip discover --bbox "w,s,e,n" -v   # override AOI
+uv run ndip ingest                         # discover, then land results in bronze
+uv run ndip detect                         # change detection -> silver.change_polygons
+uv run ndip detect --bbox "w,s,e,n" --no-write   # try a small area without persisting
+uv run ndip expose                         # exposure for corroborated changes -> gold.exposure
+uv run ndip context                        # terrain + rainfall conditions -> gold.event_context
+
+mise run pipeline     # the whole thing, bronze through gold to the report, one command
+mise run dagster      # the same graph in a UI at localhost:3000
 ```
+
+The warehouse defaults to `data/warehouse` on the local filesystem with a SQLite
+catalog. To run against object storage instead:
+
+```bash
+mise run minio-up                      # MinIO on :9000, console on :9001
+cp .env.local.example .env.local
+set -a; source .env.local; set +a
+uv run ndip ingest                     # same command, now writing to s3://
+```
+
+Verified: the identical ingest produced 103 rows on both backends, with Hive-style
+partition paths under `bronze/stac_items/data/event_id=.../collection=.../`. The
+only difference between local and cloud is the warehouse URI and the credentials.
 
 Docker Desktop on Windows with WSL integration enabled for this Ubuntu distro. If `docker`
 vanishes from PATH, the toggle is Docker Desktop → Settings → Resources → WSL Integration.
+
+If a docker command hangs, check for an earlier one still running (`pgrep -af 'docker compose'`)
+before blaming the network. The CLI serialises behind a stuck call, and every later command
+then hangs and reports nonsense — `docker info` claimed zero images while three were present.
+`curl --unix-socket /var/run/docker.sock http://localhost/_ping` asks the daemon directly and
+tells you within milliseconds whether the daemon or the CLI is at fault.
 
 ## Gotchas that have already bitten
 
@@ -34,8 +62,48 @@ vanishes from PATH, the toggle is Docker Desktop → Settings → Resources → 
   looks perfectly healthy and is wrong.
 - **Optical is not the primary sensor here.** Monsoon cloud makes Sentinel-2 useless in the
   event window. See ADR 0001 before "just adding NDVI".
+- **Publish local service ports on loopback, not every interface.** `"9000:9000"` in
+  compose listens on `0.0.0.0`; write `"127.0.0.1:9000:9000"`. Nothing outside this
+  machine needs the local warehouse, and the local credentials are throwaway.
 - **ERA5 is a ~25 km grid.** Every rainfall figure leaving this system carries the
   "context, not measurement" caveat. Do not present it as observed rainfall.
+- **Bronze writes upsert, they do not append.** Ingests get retried; a rerun must
+  correct rows in place. If you add a bronze table, give it a natural key.
+- **Read cloud rasters through the Planetary Computer, not the AWS mirrors.** The
+  AWS copies are addressed as `s3://`; GDAL then attempts a signed request and, with
+  no credentials, hangs instead of failing. Ten minutes of no traffic and no error.
+  `configure_gdal()` sets connect and read timeouts — call it before any raster read.
+- **WorldPop constrained sums ~20% above the UN estimate for Nepal.** That ratio is
+  stored on every gold row. Report population as indicative; never scale it silently.
+- **Overture is public S3 but the AWS default credential chain will try to sign it.**
+  Set empty `s3_access_key_id`/`s3_secret_access_key` in DuckDB for unsigned reads.
+- **Buffer in metres, never in degrees.** At 28N a degree of longitude is ~12% shorter
+  than a degree of latitude, so a degree buffer is an ellipse. `buffer_metres` projects.
+- **Silver stores geometry in WGS84; the terrain grid is projected.** Convert before any
+  zonal read. Rasterising a lon/lat polygon against a metre grid selects nothing and
+  reported every region at 0 m on flat ground. `build_context` now raises instead.
+- **Aspect is a bearing, so average it as a vector.** The arithmetic mean of 350 and 10
+  is 180, pointing opposite to both. Flat cells carry no aspect at all, not north.
+- **`ndip.orchestration.definitions` cannot use `from __future__ import annotations`.**
+  Dagster resolves an asset's config class from the annotation at import time and a
+  string annotation defeats it, with an error that names the class rather than the cause.
+- **Only `bronze_observations` may touch the network.** Downstream assets read tables.
+  An asset that re-fetches its inputs does not depend on what it declares, and there is
+  a test in `tests/unit/test_orchestration.py` that fails if one starts to.
+- **A high-altitude radar darkening is probably wet snow, not a landslide.** Snow absorbs
+  radar and darkens sharply. Check elevation before believing a steep-slope detection.
+  VH agreement does not clear it: wet snow absorbs in both polarisations, so cross-channel
+  agreement is what snow predicts too.
+- **The report page reads gold and only gold.** Anything it re-derives from silver becomes
+  a second implementation of a rule that already has one, and the two will drift.
+- **Give any silver/gold row an id derived from its content**, never a running index.
+  Index ids collide across runs and the upsert quietly overwrites unrelated rows.
+- **Sentinel-1 arrives as several frames per acquisition**, sliced along the orbit
+  (you will see 00:18 and 00:19 on the same track). They are not duplicates, and one
+  of the two can miss the area entirely — a frame that looks perfectly valid and
+  contains nothing. `RtcLoader` keeps only frames covering at least 1% of the area and
+  mosaics them per acquisition day; `discover` still names a single representative
+  frame per pair, which is fine for reporting and is not what detection reads.
 
 ## Layering
 

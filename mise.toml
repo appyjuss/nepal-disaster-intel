@@ -30,9 +30,21 @@ run = ["uv run ruff format src tests", "uv run ruff check --fix src tests"]
 [tasks.typecheck]
 run = "uv run mypy"
 
+[tasks.minio-up]
+description = "Start local S3 (MinIO) and create the warehouse bucket"
+run = "docker compose up -d --wait"
+
+[tasks.minio-down]
+description = "Stop local S3; add -v to also drop the stored objects"
+run = "docker compose down"
+
+[tasks.pipeline]
+description = "Run the whole pipeline end to end, bronze through gold"
+run = "uv run dagster asset materialize --select '*' -m ndip.orchestration.definitions"
+
 [tasks.dagster]
-description = "Launch Dagster UI at localhost:3000"
-run = "uv run dagster dev -m orchestration.definitions"
+description = "Launch the Dagster UI at localhost:3000"
+run = "uv run dagster dev -m ndip.orchestration.definitions"
 
 [tasks.tf-test]
 description = "Validate infra with mocked providers (no cloud, no Docker)"

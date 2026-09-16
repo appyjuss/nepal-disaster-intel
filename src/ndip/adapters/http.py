@@ -20,7 +20,10 @@ def build_client(
     """A client with an explicit timeout on every phase. There is no unbounded call."""
     return httpx.Client(
         timeout=timeout or DEFAULT_TIMEOUT,
-        headers={"User-Agent": "ndip/0.1 (Nepal Disaster Intelligence Platform)", **(headers or {})},
+        headers={
+            "User-Agent": "ndip/0.1 (Nepal Disaster Intelligence Platform)",
+            **(headers or {}),
+        },
         follow_redirects=True,
     )
 
