@@ -13,3 +13,6 @@ data/**
 *.tfstate*
 .tofu/
 .env.local
+
+# Internal scope contract, kept local
+docs/contract-v1.md

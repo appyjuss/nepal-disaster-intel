@@ -21,6 +21,7 @@ dependencies = [
   "scipy>=1.14",
   "structlog>=24.4",
   "tenacity>=9.0",
+  "pillow>=10.4",
 ]
 
 [project.optional-dependencies]
