@@ -27,7 +27,8 @@ Sentinel-1 · Sentinel-2 · COP-DEM · ERA5 · Overture/OSM · WorldPop
 | V1 bronze ingest — Iceberg tables, idempotent | **working** |
 | S3-backed warehouse via MinIO (same code path) | **working** |
 | V1 change detection — dual-geometry SAR, silver polygons | **working** |
-| V1 exposure analysis + gold tables | next |
+| V1 exposure — Overture + WorldPop, gold.exposure | **working** |
+| V1 event context table + one-command rerun | next |
 | V2 lakehouse at Nepal scale (Spark) | planned |
 | V3 historical disaster corpus | planned |
 | V4 ML susceptibility / impact | planned |

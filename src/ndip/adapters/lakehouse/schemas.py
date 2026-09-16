@@ -27,11 +27,13 @@ GOLD_NAMESPACE = "gold"
 STAC_ITEMS = f"{BRONZE_NAMESPACE}.stac_items"
 RAINFALL_DAILY = f"{BRONZE_NAMESPACE}.rainfall_daily"
 CHANGE_POLYGONS = f"{SILVER_NAMESPACE}.change_polygons"
+EXPOSURE = f"{GOLD_NAMESPACE}.exposure"
 
 # Natural keys. Re-ingesting the same event must update these rows, not add to them.
 STAC_ITEMS_KEY = ["event_id", "collection", "item_id"]
 RAINFALL_DAILY_KEY = ["event_id", "observed_on"]
 CHANGE_POLYGONS_KEY = ["event_id", "polygon_id"]
+EXPOSURE_KEY = ["event_id", "polygon_id"]
 
 STAC_ITEMS_SCHEMA = Schema(
     NestedField(1, "event_id", StringType(), required=True),
@@ -107,5 +109,38 @@ CHANGE_POLYGONS_SCHEMA = Schema(
 )
 
 CHANGE_POLYGONS_PARTITION = PartitionSpec(
+    PartitionField(source_id=1, field_id=1000, transform=IdentityTransform(), name="event_id"),
+)
+
+
+# Gold answers a question, so each row carries the answer and everything needed to
+# audit it: which reference data, which buffer, and how far the population product
+# is known to run above the national estimate.
+EXPOSURE_SCHEMA = Schema(
+    NestedField(1, "event_id", StringType(), required=True),
+    NestedField(2, "polygon_id", StringType(), required=True),
+    NestedField(3, "area_m2", DoubleType(), required=True),
+    NestedField(4, "confidence", StringType(), required=True),
+    NestedField(5, "change_class", StringType(), required=True),
+    NestedField(6, "centroid_lon", DoubleType(), required=True),
+    NestedField(7, "centroid_lat", DoubleType(), required=True),
+    NestedField(8, "buffer_m", DoubleType(), required=True),
+    NestedField(9, "roads_within", IntegerType(), required=True),
+    NestedField(10, "roads_in_buffer", IntegerType(), required=True),
+    NestedField(11, "bridges_within", IntegerType(), required=True),
+    NestedField(12, "bridges_in_buffer", IntegerType(), required=True),
+    NestedField(13, "buildings_within", IntegerType(), required=True),
+    NestedField(14, "buildings_in_buffer", IntegerType(), required=True),
+    NestedField(15, "population_within", DoubleType(), required=True),
+    NestedField(16, "population_in_buffer", DoubleType(), required=True),
+    NestedField(17, "overture_release", StringType(), required=True),
+    NestedField(18, "population_product", StringType(), required=True),
+    NestedField(19, "population_bias", DoubleType(), required=True),
+    NestedField(20, "source_frame_ids", StringType(), required=True),
+    NestedField(21, "assessed_at", TimestamptzType(), required=True),
+    identifier_field_ids=[],
+)
+
+EXPOSURE_PARTITION = PartitionSpec(
     PartitionField(source_id=1, field_id=1000, transform=IdentityTransform(), name="event_id"),
 )
